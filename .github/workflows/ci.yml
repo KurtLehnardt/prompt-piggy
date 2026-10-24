@@ -87,20 +87,139 @@ jobs:
   e2e:
     name: E2E tests
     runs-on: ubuntu-latest
+    # It pulls and starts local Supabase, so a hung start or dev server must
+    # not hold a runner for the default 360 minutes (REVIEW-PR5 M3).
+    timeout-minutes: 30
     env:
-      # Fake values, so the proxy builds a Supabase client on every request.
-      # No session cookie is ever sent, so it never calls Supabase. These are
-      # the legacy names, which the app still reads as a fallback.
-      NEXT_PUBLIC_SUPABASE_URL: https://fake-project.supabase.invalid
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: fake-ci-anon-key
+      # The origin of the dev server that Playwright starts (playwright.config.ts
+      # uses port 3000 unless PLAYWRIGHT_PORT is set, and CI does not set it).
+      # The same-origin check on POST routes compares against it, so without it
+      # every E2E POST would get 403.
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # REVIEW-3 R3-03: an obviously fake projector token (at least 32
+      # characters, containing "fake"), so /live/enter works in E2E runs. Like
+      # every fake value in this file it has the fake-ci-* shape that
+      # .gitleaks.toml allowlists here and nowhere else.
+      LIVE_VIEW_TOKEN: fake-ci-live-view-token-for-e2e-tests-only
+      # supabase/config.toml (PP-03) reads the Google OAuth client through
+      # env(). E2E runs sign in with the local test login, never Google, so
+      # fake values are enough for `supabase start`.
+      SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: fake-ci-google-client-id
+      SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET: fake-ci-google-client-secret
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+
+      # REVIEW-2 R2-09: until PP-03 adds supabase/config.toml there is no
+      # local Supabase to start. PP-01's fake values then make the proxy build
+      # a Supabase client on every request; no session cookie is ever sent, so
+      # it never calls Supabase. They use the legacy names, which the app still
+      # reads as a fallback. They are written here, not in the job's env, so
+      # they can never shadow the local values exported below.
+      - name: Use fake Supabase values (no supabase/config.toml yet)
+        if: hashFiles('supabase/config.toml') == ''
+        run: |
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=https://fake-project.supabase.invalid"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=fake-ci-anon-key"
+          } >> "$GITHUB_ENV"
+
+      # The next four steps run only when supabase/config.toml exists. The db
+      # job reuses them through these YAML anchors.
+      - &start-local-supabase
+        name: Start local Supabase
+        if: hashFiles('supabase/config.toml') != ''
+        run: |
+          set -euo pipefail
+          # The CLI prints the local keys when it starts, so its output goes
+          # to a file instead of the log. On failure only the lines that name
+          # no key, secret, token, password, or URL are printed. Studio,
+          # imgproxy, edge functions, analytics, vector, and the pooler are
+          # not used by CI, so they are not started.
+          log="$RUNNER_TEMP/supabase-start.log"
+          if ! pnpm db:start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor > "$log" 2>&1; then
+            echo "::error::supabase start failed. Its output, without any line that names a key, secret, token, password, or URL:"
+            grep -viE 'key|secret|jwt|token|password|://' "$log" || true
+            exit 1
+          fi
+          rm -f "$log"
+          echo "Local Supabase is running."
+
+      - &reset-local-database
+        name: Reset the local database (migrations and seed)
+        if: hashFiles('supabase/config.toml') != ''
+        run: pnpm db:reset
+
+      # Maps the CLI's names to the app's: API_URL to NEXT_PUBLIC_SUPABASE_URL,
+      # PUBLISHABLE_KEY (or ANON_KEY when the CLI prints no publishable key)
+      # to NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SECRET_KEY (or
+      # SERVICE_ROLE_KEY) to SUPABASE_SECRET_KEY. Each value is masked before
+      # it reaches GITHUB_ENV and is never echoed.
+      - &export-local-supabase-env
+        name: Export the local Supabase settings
+        if: hashFiles('supabase/config.toml') != ''
+        run: |
+          set -euo pipefail
+          status_file="$RUNNER_TEMP/supabase-status.env"
+          pnpm exec supabase status -o env > "$status_file"
+          # Prints one NAME="value" entry's value without its quotes. It is
+          # only ever captured into a variable.
+          value_of() {
+            awk -v name="$1" 'index($0, name "=") == 1 { value = substr($0, length(name) + 2); gsub(/^"|"$/, "", value); print value; exit }' "$status_file"
+          }
+          url="$(value_of API_URL)"
+          publishable="$(value_of PUBLISHABLE_KEY)"
+          publishable_from=PUBLISHABLE_KEY
+          if [ -z "$publishable" ]; then
+            publishable="$(value_of ANON_KEY)"
+            publishable_from=ANON_KEY
+          fi
+          secret="$(value_of SECRET_KEY)"
+          secret_from=SECRET_KEY
+          if [ -z "$secret" ]; then
+            secret="$(value_of SERVICE_ROLE_KEY)"
+            secret_from=SERVICE_ROLE_KEY
+          fi
+          rm -f "$status_file"
+          missing=""
+          [ -n "$url" ] || missing="$missing API_URL"
+          [ -n "$publishable" ] || missing="$missing PUBLISHABLE_KEY/ANON_KEY"
+          [ -n "$secret" ] || missing="$missing SECRET_KEY/SERVICE_ROLE_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::supabase status -o env printed no value for:$missing"
+            exit 1
+          fi
+          echo "::add-mask::$url"
+          echo "::add-mask::$publishable"
+          echo "::add-mask::$secret"
+          {
+            printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$url"
+            printf 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=%s\n' "$publishable"
+            printf 'SUPABASE_SECRET_KEY=%s\n' "$secret"
+          } >> "$GITHUB_ENV"
+          echo "Exported NEXT_PUBLIC_SUPABASE_URL (from API_URL), NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (from $publishable_from), and SUPABASE_SECRET_KEY (from $secret_from)."
+
+      # Only the host, so the log shows which backend this run used.
+      - name: Show which Supabase backend this run uses
+        run: |
+          node -e '
+            let host = "(unset or not a URL)"
+            try { host = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host } catch {}
+            console.log("Supabase backend for this run: " + host)
+          '
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
       - name: Playwright
+        env:
+          # Fake AI models and the local-only test login (ARCHITECTURE section
+          # 1.2, row 5); the flag never bypasses auth. ALLOW_E2E_TEST_MODE is
+          # the escape hatch that scripts/check-e2e-test-mode.mjs requires
+          # outside a Vercel preview.
+          E2E_TEST_MODE: 'true'
+          ALLOW_E2E_TEST_MODE: '1'
         run: pnpm test:e2e
       - name: Upload the Playwright report
         if: failure()
@@ -109,6 +228,11 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+      - &stop-local-supabase
+        name: Stop local Supabase
+        if: always() && hashFiles('supabase/config.toml') != ''
+        run: pnpm exec supabase stop --no-backup
 
   secret-scan:
     name: Secret scan
@@ -192,12 +316,70 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
           "$RUNNER_TEMP/gitleaks" version
 
-      # Scans every commit reachable from the checkout with the default rules
-      # plus the config chosen above. Findings are redacted in the log, inline
-      # gitleaks:allow comments are ignored, and any finding fails the job.
-      - name: gitleaks (full history, redacted)
+      # REVIEW-2 R2-11, CH2-3, T30: prove that the pinned scanner, with the
+      # config chosen above, still reports a GitHub token. The token is random,
+      # generated at run time in RUNNER_TEMP outside the checkout, never
+      # printed, and deleted afterwards, so no key-shaped value is ever
+      # committed or pushed. `gitleaks dir` (from `gitleaks --help`) scans the
+      # directory without git history. gitleaks also exits 1 on an error, so
+      # the step requires exit 1 and a github-pat finding in the redacted
+      # report.
+      - name: gitleaks self-test (a token generated at run time must be found)
         run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/gitleaks-self-test"
+          report="$RUNNER_TEMP/gitleaks-self-test.json"
+          rm -rf "$dir" "$report"
+          mkdir -p "$dir"
+          python3 - "$dir/credentials.txt" <<'PY'
+          import secrets, string, sys
+          alphabet = string.ascii_letters + string.digits
+          token = "ghp_" + "".join(secrets.choice(alphabet) for _ in range(36))
+          with open(sys.argv[1], "w", encoding="utf-8") as handle:
+              handle.write(f"github_token = {token}\n")
+          PY
+          set +e
+          "$RUNNER_TEMP/gitleaks" dir "$dir" \
+            --config "$GITLEAKS_CONFIG_PATH" \
+            --redact \
+            --ignore-gitleaks-allow \
+            --no-banner \
+            --report-format json \
+            --report-path "$report" \
+            --exit-code 1
+          status=$?
+          set -e
+          rm -rf "$dir"
+          found="$(jq '[.[] | select(.RuleID == "github-pat")] | length' "$report" 2>/dev/null || echo 0)"
+          rm -f "$report"
+          if [ "$status" -ne 1 ] || [ "$found" -lt 1 ]; then
+            echo "::error::gitleaks exited ${status} and reported ${found} github-pat finding(s) for a generated GitHub token; it must exit 1 with at least one. The secret scan cannot be trusted."
+            exit 1
+          fi
+          echo "gitleaks reported the generated token (github-pat) and exited 1, as expected."
+
+      # Scans every commit reachable from HEAD with the default rules plus the
+      # config chosen above. On a pull request, HEAD is GitHub's merge commit,
+      # so that is the base branch's full history plus every commit of this
+      # pull request. On a push to main, it is main's full history. Other
+      # fetched branches are not scanned: without --log-opts gitleaks runs
+      # `git log --all`, so one finding on any parallel branch failed every
+      # pull request, and only a force-push could clear it. That branch's own
+      # pull request still scans it. Findings are redacted in the log, inline
+      # gitleaks:allow comments are ignored, and any finding fails the job.
+      - name: gitleaks (base branch history and this change, redacted)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Scanning the history of ${BASE_REF} plus $(git rev-list --count "origin/${BASE_REF}..HEAD") commit(s) of this pull request (merge commit included)."
+          else
+            echo "Scanning the full history of ${GITHUB_REF_NAME}: $(git rev-list --count HEAD) commit(s)."
+          fi
           "$RUNNER_TEMP/gitleaks" git . \
+            --log-opts="--full-history HEAD" \
             --config "$GITLEAKS_CONFIG_PATH" \
             --redact \
             --ignore-gitleaks-allow \
@@ -205,13 +387,184 @@ jobs:
             --verbose \
             --exit-code 1
 
+  # REVIEW-1 R1-14, REVIEW-2 R2-18: migrations, pgTAP, generated types, the
+  # advisors, and the concurrency scenario against local Supabase. Every step
+  # is skipped while its inputs are absent, so the job is green before PP-03
+  # adds supabase/config.toml and the 00001 migration, and before PP-22 adds
+  # scripts/db/concurrency.mjs.
+  db:
+    name: Database
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # supabase/config.toml reads the Google OAuth client through env(). No
+      # database step signs in with Google, so fake values are enough.
+      SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID: fake-ci-google-client-id
+      SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET: fake-ci-google-client-secret
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Skip the database checks (no supabase/config.toml yet)
+        if: hashFiles('supabase/config.toml') == ''
+        run: echo "::notice title=Database checks skipped::supabase/config.toml is not on this branch yet (PP-03 adds it with the 00001 migration), so every database step is skipped."
+      - uses: ./.github/actions/setup
+        if: hashFiles('supabase/config.toml') != ''
+
+      - *start-local-supabase
+      - *reset-local-database
+
+      - name: pgTAP tests
+        if: hashFiles('supabase/config.toml') != ''
+        run: pnpm db:test
+
+      # conventions.test_commands.db_types_drift
+      - name: Generated database types match the migrations
+        if: hashFiles('supabase/config.toml') != ''
+        run: |
+          set -euo pipefail
+          pnpm db:types
+          git diff --exit-code src/types/database.ts
+
+      # `supabase db advisors` on CLI 2.122, with flags from
+      # `supabase db advisors --help`: --local checks the local database,
+      # --type all runs the security and performance advisors, --level info
+      # reports every finding, and --fail-on none leaves the verdict to the
+      # allowlist below. Any security finding that no allowlist entry covers
+      # fails the job, at every level; performance findings are printed and
+      # never fail it. A finding that is not marked as performance only is
+      # treated as security, so an unknown category fails closed.
+      - name: Database advisors (security findings must be allowlisted)
+        if: hashFiles('supabase/config.toml') != ''
+        env:
+          # Security advisor allowlist. One entry per line: the lint name,
+          # then the object as schema.name, where schema.* covers every object
+          # in that schema. Each entry needs its reason in this comment.
+          #
+          # - get_level_status() and get_public_config() are the two intended
+          #   public SECURITY DEFINER functions (ARCHITECTURE section 5.1).
+          #   They read tables that anon cannot read and return only public
+          #   columns, so anon and authenticated may execute them. The hosted
+          #   advisor reports this as lints 0028 and 0029. CLI 2.122 does not
+          #   run those two lints yet; the entries stay so the allowlist is
+          #   still right when it does.
+          # - rls_enabled_no_policy (level INFO) on the section 5.3 tables
+          #   with no policy: deny by default. A table with RLS enabled and no
+          #   policy is reachable only by service_role, which is the intended
+          #   access model for exactly these ten tables in ARCHITECTURE
+          #   section 5.3. app_config is not listed, because 00001 gives it a
+          #   restrictive policy. Any other table without a policy fails the
+          #   job and needs an explicit decision (REVIEW-PR5 M1). Entries for
+          #   tables that do not exist yet are only logged as unused.
+          ADVISOR_SECURITY_ALLOWLIST: |
+            anon_security_definer_function_executable public.get_level_status
+            authenticated_security_definer_function_executable public.get_level_status
+            anon_security_definer_function_executable public.get_public_config
+            authenticated_security_definer_function_executable public.get_public_config
+            rls_enabled_no_policy public.rule_sets
+            rls_enabled_no_policy public.rule_gate_runs
+            rls_enabled_no_policy public.golden_prompts
+            rls_enabled_no_policy public.blocked_fingerprints
+            rls_enabled_no_policy public.level_secrets
+            rls_enabled_no_policy public.ai_spend
+            rls_enabled_no_policy public.rate_limits
+            rls_enabled_no_policy public.hardening_jobs
+            rls_enabled_no_policy public.admin_actions
+            rls_enabled_no_policy public.leases
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/supabase-advisors.json"
+          pnpm exec supabase db advisors --local --type all --level info --fail-on none --output-format json > "$report"
+          node - "$report" <<'JS'
+          const fs = require('node:fs')
+          const raw = fs.readFileSync(process.argv[2], 'utf8')
+          const parse = (text) => {
+            try { return JSON.parse(text) } catch {}
+            for (const line of text.split('\n').reverse()) {
+              if (!line.trim().startsWith('{')) continue
+              try { return JSON.parse(line) } catch {}
+            }
+            return undefined
+          }
+          const report = parse(raw)
+          const findings = Array.isArray(report) ? report : Array.isArray(report?.results) ? report.results : null
+          if (!findings) {
+            console.log('::error title=Database advisors::The advisor output is not JSON with a results array.')
+            process.exit(1)
+          }
+          const allowlist = (process.env.ADVISOR_SECURITY_ALLOWLIST ?? '')
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean)
+            .map((line) => {
+              const [lint, object, extra] = line.split(/\s+/)
+              if (!lint || !object || extra) {
+                console.log(`::error title=Database advisors::Malformed allowlist entry: ${line}`)
+                process.exit(1)
+              }
+              return { lint, object, matched: 0 }
+            })
+          const objectOf = (finding) => `${finding.metadata?.schema ?? '?'}.${finding.metadata?.name ?? '?'}`
+          const covers = (entry, finding) =>
+            entry.lint === finding.name &&
+            (entry.object === objectOf(finding) ||
+              (entry.object.endsWith('.*') && objectOf(finding).startsWith(entry.object.slice(0, -1))))
+          let blocked = 0
+          let allowed = 0
+          let performance = 0
+          for (const finding of findings) {
+            const categories = Array.isArray(finding.categories) ? finding.categories : []
+            const summary = `[${finding.level}] ${finding.name} on ${objectOf(finding)}: ${finding.detail}`
+            if (categories.includes('PERFORMANCE') && !categories.includes('SECURITY')) {
+              performance++
+              console.log(`performance   ${summary}`)
+              continue
+            }
+            const entry = allowlist.find((candidate) => covers(candidate, finding))
+            if (entry) {
+              entry.matched++
+              allowed++
+              console.log(`allowlisted   ${summary}`)
+            } else {
+              blocked++
+              console.log(`::error title=Security advisor::${summary}`)
+            }
+          }
+          for (const entry of allowlist) {
+            if (entry.matched === 0) console.log(`Allowlist entry not used in this run: ${entry.lint} ${entry.object}`)
+          }
+          console.log(`Security findings: ${blocked} not allowlisted, ${allowed} allowlisted. Performance findings: ${performance}.`)
+          if (blocked > 0) process.exit(1)
+          JS
+
+      # scripts/db/concurrency.mjs (PP-22) uses the secret key against local
+      # Supabase, so the settings are exported first.
+      - *export-local-supabase-env
+      - name: Concurrency scenario
+        if: hashFiles('supabase/config.toml') != '' && hashFiles('scripts/db/concurrency.mjs') != ''
+        run: pnpm db:concurrency
+
+      - *stop-local-supabase
+
+  # REVIEW-1 R1-23: every scripts/check-*.mjs guard and its --self-test.
+  guardrails:
+    name: Guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Guardrail checks and their self-tests
+        run: pnpm guardrails
+
   # Single required status check, so branch protection does not need updating
   # every time a job is added or renamed.
   ci:
     name: CI
     runs-on: ubuntu-latest
     if: always()
-    needs: [lint, typecheck, unit, build, e2e, secret-scan]
+    needs: [lint, typecheck, unit, build, e2e, secret-scan, db, guardrails]
     steps:
       - name: Report
         run: |
@@ -221,6 +574,8 @@ jobs:
           echo "build:       ${{ needs.build.result }}"
           echo "e2e:         ${{ needs.e2e.result }}"
           echo "secret-scan: ${{ needs.secret-scan.result }}"
+          echo "db:          ${{ needs.db.result }}"
+          echo "guardrails:  ${{ needs.guardrails.result }}"
       - name: Fail if any job did not succeed
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
