@@ -1,0 +1,226 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to a pull request makes the in-flight run obsolete.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: ESLint
+        run: pnpm lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      # next-env.d.ts and .next/types are generated, not committed. typegen
+      # recreates them so the typecheck sees Next.js's asset and route types.
+      - name: next typegen
+        run: pnpm exec next typegen
+      - name: tsc --noEmit
+        run: pnpm typecheck
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Vitest (server and ui projects)
+        run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+
+      # REVIEW-1 R1-14: a fresh Vercel import has no environment variables, so
+      # the build must not read any of them at import time.
+      - name: next build with an empty environment
+        run: pnpm build
+
+      # Obviously fake values, each containing the word "fake". Every
+      # environment read happens inside a function, so the build never uses
+      # them; they only prove that a configured build also succeeds. Real
+      # values live in the Vercel project settings, never in this repository.
+      # This step uses the names the Supabase Vercel integration syncs; the e2e
+      # job uses the legacy names, so both are exercised.
+      - name: next build with fake values
+        env:
+          NEXT_PUBLIC_APP_URL: https://fake-app.example.invalid
+          NEXT_PUBLIC_SUPABASE_URL: https://fake-project.supabase.invalid
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: fake-ci-publishable-key
+          SUPABASE_SECRET_KEY: fake-ci-secret-key
+          OPENAI_API_KEY: fake-ci-openai-key
+          CRON_SECRET: fake-ci-cron-secret
+        run: pnpm build
+
+  e2e:
+    name: E2E tests
+    runs-on: ubuntu-latest
+    env:
+      # Fake values, so the proxy builds a Supabase client on every request.
+      # No session cookie is ever sent, so it never calls Supabase. These are
+      # the legacy names, which the app still reads as a fallback.
+      NEXT_PUBLIC_SUPABASE_URL: https://fake-project.supabase.invalid
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: fake-ci-anon-key
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Playwright
+        run: pnpm test:e2e
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      # sha256 of gitleaks_8.30.1_linux_x64.tar.gz from the release's checksums file.
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      # The full history, so a secret committed and later deleted is still found.
+      # It also fetches the base branch, which the config step below reads.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A pull request must not be able to allowlist its own leak.
+      # - gitleaks reads .gitleaksignore from the scanned directory, so this
+      #   repository refuses to have one at all.
+      # - On a pull request, the scan uses .gitleaks.toml from the base branch,
+      #   so a change to the allowlist only takes effect after it has been
+      #   reviewed and merged on its own. This fails closed: if the base branch
+      #   cannot be read, the job fails instead of falling back to the pull
+      #   request's own config. If the base branch exists but has no config yet
+      #   (the pull request that first adds one), the scan uses gitleaks'
+      #   default rules with no allowlist, which is stricter than any config.
+      # - --config is always passed, because without it gitleaks would read the
+      #   checked-out .gitleaks.toml by itself.
+      - name: Choose the gitleaks config
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ -e .gitleaksignore ]; then
+            echo "::error file=.gitleaksignore::.gitleaksignore is not allowed: it would let a commit hide its own findings. Remove the secret instead."
+            exit 1
+          fi
+          config="$RUNNER_TEMP/gitleaks.toml"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ -z "$BASE_REF" ]; then
+              echo "::error::This pull request has no base branch name, so the base .gitleaks.toml cannot be read."
+              exit 1
+            fi
+            base="origin/${BASE_REF}"
+            if ! git rev-parse --verify --quiet "${base}^{commit}" > /dev/null; then
+              echo "::error::${base} was not fetched, so its .gitleaks.toml cannot be read. Refusing to fall back to this pull request's config."
+              exit 1
+            fi
+            # ls-tree fails if the base tree cannot be read, and set -e then
+            # fails the job. An empty listing means the file is not there.
+            listing="$(git ls-tree --name-only "$base" -- .gitleaks.toml)"
+            if [ "$listing" = ".gitleaks.toml" ]; then
+              git show "${base}:.gitleaks.toml" > "$config"
+              if ! git diff --quiet "$base" HEAD -- .gitleaks.toml; then
+                echo "::warning file=.gitleaks.toml::This pull request changes .gitleaks.toml. It is scanned with the config from ${BASE_REF}; the change takes effect once merged."
+              fi
+              echo "Using .gitleaks.toml from ${base}."
+            else
+              printf '%s\n' 'title = "gitleaks default rules, no allowlist"' '' '[extend]' 'useDefault = true' > "$config"
+              if [ -e .gitleaks.toml ]; then
+                echo "::warning file=.gitleaks.toml::${BASE_REF} has no .gitleaks.toml yet, so this pull request is scanned with gitleaks' default rules and no allowlist. Its .gitleaks.toml takes effect once merged."
+              fi
+              echo "Using gitleaks' default rules with no allowlist: ${base} has no .gitleaks.toml."
+            fi
+          else
+            # A push to main: the checked-out tree is main itself. cp fails,
+            # and so does the job, if the file is missing.
+            cp .gitleaks.toml "$config"
+            echo "Using .gitleaks.toml from the checked-out tree."
+          fi
+          echo "GITLEAKS_CONFIG_PATH=$config" >> "$GITHUB_ENV"
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" version
+
+      # Scans every commit reachable from the checkout with the default rules
+      # plus the config chosen above. Findings are redacted in the log, inline
+      # gitleaks:allow comments are ignored, and any finding fails the job.
+      - name: gitleaks (full history, redacted)
+        run: |
+          "$RUNNER_TEMP/gitleaks" git . \
+            --config "$GITLEAKS_CONFIG_PATH" \
+            --redact \
+            --ignore-gitleaks-allow \
+            --no-banner \
+            --verbose \
+            --exit-code 1
+
+  # Single required status check, so branch protection does not need updating
+  # every time a job is added or renamed.
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, typecheck, unit, build, e2e, secret-scan]
+    steps:
+      - name: Report
+        run: |
+          echo "lint:        ${{ needs.lint.result }}"
+          echo "typecheck:   ${{ needs.typecheck.result }}"
+          echo "unit:        ${{ needs.unit.result }}"
+          echo "build:       ${{ needs.build.result }}"
+          echo "e2e:         ${{ needs.e2e.result }}"
+          echo "secret-scan: ${{ needs.secret-scan.result }}"
+      - name: Fail if any job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
