@@ -439,6 +439,11 @@ isOneToOne: true
 "app_config_value_ok":
 { Args: { "p_key": string,"p_value": Json }; Returns: boolean
                            },
+"attempt_result":
+{ Args: { "p_attempt_id": string,"p_user_id": string }; Returns: {
+              "aura_bps": number,"crack_event": Database["public"]['Enums']["crack_event"],"cracks_after": number,"current_level": number,"level_id": number,"level_to": number,"outcome": Database["public"]['Enums']["attempt_outcome"],"payout_cents": number,"pig_epoch": number,"refund_cents": number,"refund_withheld": boolean,"reply": string,"technique": Database["public"]['Enums']["attack_technique"],"treasury_cents": number,"wallet_balance_cents": number
+            }[]
+                           },
 "claim_hardening_job":
 { Args: { "p_job_id"?: string }; Returns: {
               "attempt_id": string,
@@ -515,6 +520,11 @@ isOneToOne: true
 "reap_stale_attempts":
 { Args: { "p_limit"?: number,"p_older_than_seconds"?: number }; Returns: number
                            },
+"record_attempt":
+{ Args: { "p_attempt_id": string,"p_block_fingerprint": boolean,"p_canary_leaked": boolean,"p_cost_micros": number,"p_error_code": string,"p_outcome": Database["public"]['Enums']["attempt_outcome"],"p_reply": string,"p_technique": Database["public"]['Enums']["attack_technique"],"p_tool_called": boolean,"p_tripwire_probability": number,"p_user_jobs_per_hour": number,"p_validator_reasons": (string)[],"p_validator_signals": (string)[] }; Returns: {
+              "aura_bps": number,"crack_event": Database["public"]['Enums']["crack_event"],"cracks_after": number,"current_level": number,"hardening_job_id": string,"level_from": number,"level_to": number,"outcome": Database["public"]['Enums']["attempt_outcome"],"payout_cents": number,"pig_epoch": number,"refund_cents": number,"refund_withheld": boolean,"treasury_cents": number,"wallet_balance_cents": number
+            }[]
+                           },
 "reject_rule_set":
 { Args: { "p_needs_review": boolean,"p_rejection_code": string,"p_rule_set_id": string }; Returns: undefined
                            },
@@ -543,6 +553,11 @@ isOneToOne: true
                            },
 "settle_ai_spend":
 { Args: { "p_actual": number,"p_day": string,"p_kind": string,"p_reserved": number }; Returns: undefined
+                           },
+"start_attempt":
+{ Args: { "p_attempt_share_bps": number,"p_daily_attempt_cap": number,"p_daily_cap_micros": number,"p_expected_epoch": number,"p_idempotency_key": string,"p_prompt": string,"p_prompt_fingerprint": string,"p_prompt_sha256": string,"p_rate_capacity": number,"p_rate_refill_per_min": number,"p_reserve_micros": number,"p_stale_seconds": number,"p_user_id": string }; Returns: {
+              "attempt_id": string,"fingerprint_blocked": boolean,"level_id": number,"level_secret": Json,"pig_epoch": number,"price_cents": number,"replay": boolean,"rule_set_id": string,"rule_version": number,"rules": Json,"treasury_cents": number,"wallet_balance_cents": number
+            }[]
                            }
           }
           Enums: {
