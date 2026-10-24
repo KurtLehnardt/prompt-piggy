@@ -23,7 +23,35 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "app_config": {
+            "admin_actions": {
+                  Row: {
+                    "action": string,"admin_id": string,"created_at": string,"id": number,"target": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "action": string,"admin_id": string,"created_at"?: string,"id"?: never,"target"?: string | null
+                  }
+                  Update: {
+                    "action"?: string,"admin_id"?: string,"created_at"?: string,"id"?: never,"target"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"ai_spend": {
+                  Row: {
+                    "attempt_calls": number,"attempt_reserved_micros": number,"attempt_settled_micros": number,"day": string,"hardening_calls": number,"hardening_reserved_micros": number,"hardening_settled_micros": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempt_calls"?: number,"attempt_reserved_micros"?: number,"attempt_settled_micros"?: number,"day": string,"hardening_calls"?: number,"hardening_reserved_micros"?: number,"hardening_settled_micros"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "attempt_calls"?: number,"attempt_reserved_micros"?: number,"attempt_settled_micros"?: number,"day"?: string,"hardening_calls"?: number,"hardening_reserved_micros"?: number,"hardening_settled_micros"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"app_config": {
                   Row: {
                     "key": string,"updated_at": string,"updated_by": string | null,"value": NonNullable<Json>
                   }
@@ -36,6 +64,104 @@ export type Database = {
                   }
                   Relationships: [
                     
+                  ]
+                },"attempts": {
+                  Row: {
+                    "canary_leaked": boolean,"cost_micros": number,"crack_event": Database["public"]['Enums']["crack_event"] | null,"cracks_after": number | null,"created_at": string,"error_code": string | null,"finalized_at": string | null,"id": string,"idempotency_key": string,"level_id": number,"outcome": Database["public"]['Enums']["attempt_outcome"],"payout_cents": number,"pig_epoch": number,"price_cents": number,"prompt": string | null,"prompt_chars": number,"prompt_fingerprint": string,"prompt_sha256": string,"refund_cents": number,"refund_withheld": boolean,"reply": string | null,"reserved_micros": number,"rule_set_id": string,"spend_day": string,"technique": Database["public"]['Enums']["attack_technique"] | null,"tool_called": boolean,"tripwire_probability": number | null,"user_id": string,"validator_reasons": (string)[],"validator_signals": (string)[]
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "canary_leaked"?: boolean,"cost_micros"?: number,"crack_event"?: Database["public"]['Enums']["crack_event"] | null,"cracks_after"?: number | null,"created_at"?: string,"error_code"?: string | null,"finalized_at"?: string | null,"id"?: string,"idempotency_key": string,"level_id": number,"outcome"?: Database["public"]['Enums']["attempt_outcome"],"payout_cents"?: number,"pig_epoch": number,"price_cents": number,"prompt"?: string | null,"prompt_chars": number,"prompt_fingerprint": string,"prompt_sha256": string,"refund_cents"?: number,"refund_withheld"?: boolean,"reply"?: string | null,"reserved_micros"?: number,"rule_set_id": string,"spend_day": string,"technique"?: Database["public"]['Enums']["attack_technique"] | null,"tool_called"?: boolean,"tripwire_probability"?: number | null,"user_id": string,"validator_reasons"?: (string)[],"validator_signals"?: (string)[]
+                  }
+                  Update: {
+                    "canary_leaked"?: boolean,"cost_micros"?: number,"crack_event"?: Database["public"]['Enums']["crack_event"] | null,"cracks_after"?: number | null,"created_at"?: string,"error_code"?: string | null,"finalized_at"?: string | null,"id"?: string,"idempotency_key"?: string,"level_id"?: number,"outcome"?: Database["public"]['Enums']["attempt_outcome"],"payout_cents"?: number,"pig_epoch"?: number,"price_cents"?: number,"prompt"?: string | null,"prompt_chars"?: number,"prompt_fingerprint"?: string,"prompt_sha256"?: string,"refund_cents"?: number,"refund_withheld"?: boolean,"reply"?: string | null,"reserved_micros"?: number,"rule_set_id"?: string,"spend_day"?: string,"technique"?: Database["public"]['Enums']["attack_technique"] | null,"tool_called"?: boolean,"tripwire_probability"?: number | null,"user_id"?: string,"validator_reasons"?: (string)[],"validator_signals"?: (string)[]
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "attempts_level_id_fkey"
+      columns: ["level_id"]
+isOneToOne: false
+      referencedRelation: "levels"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "attempts_rule_set_id_fkey"
+      columns: ["rule_set_id"]
+isOneToOne: false
+      referencedRelation: "rule_sets"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "attempts_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"blocked_fingerprints": {
+                  Row: {
+                    "attempt_id": string | null,"created_at": string,"fingerprint": string,"level_id": number
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempt_id"?: string | null,"created_at"?: string,"fingerprint": string,"level_id": number
+                  }
+                  Update: {
+                    "attempt_id"?: string | null,"created_at"?: string,"fingerprint"?: string,"level_id"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "blocked_fingerprints_attempt_id_fkey"
+      columns: ["attempt_id"]
+isOneToOne: false
+      referencedRelation: "attempts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "blocked_fingerprints_level_id_fkey"
+      columns: ["level_id"]
+isOneToOne: false
+      referencedRelation: "levels"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"donations": {
+                  Row: {
+                    "amount_cents": number,"created_at": string,"id": number,"idempotency_key": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"created_at"?: string,"id"?: never,"idempotency_key": string,"user_id": string
+                  }
+                  Update: {
+                    "amount_cents"?: number,"created_at"?: string,"id"?: never,"idempotency_key"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "donations_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"game_state": {
+                  Row: {
+                    "current_level": number,"id": number,"pig_epoch": number,"total_attempts": number,"total_paid_out_cents": number,"total_wins": number,"treasury_cents": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "current_level"?: number,"id"?: number,"pig_epoch"?: number,"total_attempts"?: number,"total_paid_out_cents"?: number,"total_wins"?: number,"treasury_cents"?: number,"updated_at"?: string
+                  }
+                  Update: {
+                    "current_level"?: number,"id"?: number,"pig_epoch"?: number,"total_attempts"?: number,"total_paid_out_cents"?: number,"total_wins"?: number,"treasury_cents"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "game_state_current_level_fkey"
+      columns: ["current_level"]
+isOneToOne: false
+      referencedRelation: "levels"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"golden_prompts": {
                   Row: {
@@ -50,12 +176,70 @@ export type Database = {
                   }
                   Relationships: [
                     {
+      foreignKeyName: "golden_prompts_attempt_fk"
+      columns: ["attempt_id"]
+isOneToOne: false
+      referencedRelation: "attempts"
+      referencedColumns: ["id"]
+    },{
       foreignKeyName: "golden_prompts_level_id_fkey"
       columns: ["level_id"]
 isOneToOne: false
       referencedRelation: "levels"
       referencedColumns: ["id"]
     }
+                  ]
+                },"hardening_jobs": {
+                  Row: {
+                    "attempt_id": string,"claim_count": number,"claimed_at": string | null,"created_at": string,"error_code": string | null,"finished_at": string | null,"id": string,"level_id": number,"prompt_sha256": string,"rule_set_id": string | null,"status": string,"trigger": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "attempt_id": string,"claim_count"?: number,"claimed_at"?: string | null,"created_at"?: string,"error_code"?: string | null,"finished_at"?: string | null,"id"?: string,"level_id": number,"prompt_sha256": string,"rule_set_id"?: string | null,"status"?: string,"trigger": string,"user_id": string
+                  }
+                  Update: {
+                    "attempt_id"?: string,"claim_count"?: number,"claimed_at"?: string | null,"created_at"?: string,"error_code"?: string | null,"finished_at"?: string | null,"id"?: string,"level_id"?: number,"prompt_sha256"?: string,"rule_set_id"?: string | null,"status"?: string,"trigger"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "hardening_jobs_attempt_id_fkey"
+      columns: ["attempt_id"]
+isOneToOne: true
+      referencedRelation: "attempts"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hardening_jobs_level_id_fkey"
+      columns: ["level_id"]
+isOneToOne: false
+      referencedRelation: "levels"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hardening_jobs_rule_set_id_fkey"
+      columns: ["rule_set_id"]
+isOneToOne: false
+      referencedRelation: "rule_sets"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "hardening_jobs_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"ledger_entries": {
+                  Row: {
+                    "amount_cents": number,"attempt_id": string | null,"created_at": string,"external_ref": string | null,"from_account": string,"id": number,"kind": string,"to_account": string,"user_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents": number,"attempt_id"?: string | null,"created_at"?: string,"external_ref"?: string | null,"from_account": string,"id"?: never,"kind": string,"to_account": string,"user_id"?: string | null
+                  }
+                  Update: {
+                    "amount_cents"?: number,"attempt_id"?: string | null,"created_at"?: string,"external_ref"?: string | null,"from_account"?: string,"id"?: never,"kind"?: string,"to_account"?: string,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    
                   ]
                 },"level_secrets": {
                   Row: {
@@ -91,6 +275,32 @@ isOneToOne: true
                   Relationships: [
                     
                   ]
+                },"live_feed": {
+                  Row: {
+                    "amount_cents": number | null,"created_at": string,"event_type": string,"id": number,"level_id": number | null,"outcome": Database["public"]['Enums']["attempt_outcome"] | null,"player_id": string | null,"rule_version": number | null,"technique": Database["public"]['Enums']["attack_technique"] | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_cents"?: number | null,"created_at"?: string,"event_type": string,"id"?: never,"level_id"?: number | null,"outcome"?: Database["public"]['Enums']["attempt_outcome"] | null,"player_id"?: string | null,"rule_version"?: number | null,"technique"?: Database["public"]['Enums']["attack_technique"] | null
+                  }
+                  Update: {
+                    "amount_cents"?: number | null,"created_at"?: string,"event_type"?: string,"id"?: never,"level_id"?: number | null,"outcome"?: Database["public"]['Enums']["attempt_outcome"] | null,"player_id"?: string | null,"rule_version"?: number | null,"technique"?: Database["public"]['Enums']["attack_technique"] | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "live_feed_level_id_fkey"
+      columns: ["level_id"]
+isOneToOne: false
+      referencedRelation: "levels"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "live_feed_player_id_fkey"
+      columns: ["player_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "avatar_url": string | null,"created_at": string,"display_name": string,"id": string,"live_hidden": boolean,"updated_at": string
@@ -104,6 +314,26 @@ isOneToOne: true
                   }
                   Relationships: [
                     
+                  ]
+                },"rate_limits": {
+                  Row: {
+                    "bucket": string,"tokens": number,"updated_at": string,"user_id": string,"window_day": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "bucket": string,"tokens": number,"updated_at"?: string,"user_id": string,"window_day"?: string | null
+                  }
+                  Update: {
+                    "bucket"?: string,"tokens"?: number,"updated_at"?: string,"user_id"?: string,"window_day"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "rate_limits_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"rule_gate_runs": {
                   Row: {
@@ -149,6 +379,32 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "rule_sets"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "rule_sets_source_attempt_fk"
+      columns: ["source_attempt_id"]
+isOneToOne: false
+      referencedRelation: "attempts"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"wallets": {
+                  Row: {
+                    "aura_bps": number | null,"balance_cents": number,"crack_count": number,"created_at": string,"in_flight_attempt_id": string | null,"last_seen_at": string | null,"total_attempts": number,"total_donated_cents": number,"total_wins": number,"updated_at": string,"user_id": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "aura_bps"?: never,"balance_cents"?: number,"crack_count"?: number,"created_at"?: string,"in_flight_attempt_id"?: string | null,"last_seen_at"?: string | null,"total_attempts"?: number,"total_donated_cents"?: number,"total_wins"?: number,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "aura_bps"?: never,"balance_cents"?: number,"crack_count"?: number,"created_at"?: string,"in_flight_attempt_id"?: string | null,"last_seen_at"?: string | null,"total_attempts"?: number,"total_donated_cents"?: number,"total_wins"?: number,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "wallets_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: true
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
     }
                   ]
                 }
@@ -160,11 +416,31 @@ isOneToOne: false
             "app_config_value_ok":
 { Args: { "p_key": string,"p_value": Json }; Returns: boolean
                            },
+"get_level_status":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "active_version": number,"last_hardened_at": string,"level_id": number,"name": string
+            }[]
+                           },
+"get_live_players":
+{ Args: { "p_known_hash"?: string,"p_limit"?: number,"p_window_seconds"?: number }; Returns: {
+              "list_hash": string,"players": Json
+            }[]
+                           },
+"get_public_config":
+{ Args: Record<PropertyKey, never>; Returns: {
+              "attempt_price_cents": number,"attempts_enabled": boolean,"repair_price_cents": number
+            }[]
+                           },
 "insert_rule_proposal":
 { Args: { "p_level_id": number,"p_parent_id": string,"p_rules": Json,"p_source_attempt_id": string,"p_technique": Database["public"]['Enums']["attack_technique"] }; Returns: string
                            },
 "level_secret_payload_ok":
 { Args: { "p": Json }; Returns: boolean
+                           },
+"presence_ping":
+{ Args: { "p_known_hash"?: string,"p_limit"?: number,"p_user_id": string,"p_window_seconds"?: number }; Returns: {
+              "list_hash": string,"players": Json
+            }[]
                            },
 "promote_rule_set":
 { Args: { "p_rule_set_id": string }; Returns: number
@@ -183,7 +459,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "attack_technique": "roleplay_persona"|"authority_impersonation"|"instruction_override"|"delimiter_injection"|"encoded_smuggling"|"tool_or_mcp_takeover"|"deferred_trigger"|"emotional_social_engineering"|"prompt_extraction"|"multilingual_obfuscation"|"unclassified"|"unknown","review_status": "none"|"needs_review"|"dismissed"|"actioned","rule_set_state": "proposed"|"active"|"superseded"|"rejected"|"rolled_back"
+            "attack_technique": "roleplay_persona"|"authority_impersonation"|"instruction_override"|"delimiter_injection"|"encoded_smuggling"|"tool_or_mcp_takeover"|"deferred_trigger"|"emotional_social_engineering"|"prompt_extraction"|"multilingual_obfuscation"|"unclassified"|"unknown","attempt_outcome": "pending"|"win"|"late_win"|"fail"|"blocked"|"leak_blocked"|"error","crack_event": "none"|"crack"|"shatter"|"repaired","review_status": "none"|"needs_review"|"dismissed"|"actioned","rule_set_state": "proposed"|"active"|"superseded"|"rejected"|"rolled_back"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -303,7 +579,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "attack_technique": ["roleplay_persona", "authority_impersonation", "instruction_override", "delimiter_injection", "encoded_smuggling", "tool_or_mcp_takeover", "deferred_trigger", "emotional_social_engineering", "prompt_extraction", "multilingual_obfuscation", "unclassified", "unknown"],"review_status": ["none", "needs_review", "dismissed", "actioned"],"rule_set_state": ["proposed", "active", "superseded", "rejected", "rolled_back"]
+            "attack_technique": ["roleplay_persona", "authority_impersonation", "instruction_override", "delimiter_injection", "encoded_smuggling", "tool_or_mcp_takeover", "deferred_trigger", "emotional_social_engineering", "prompt_extraction", "multilingual_obfuscation", "unclassified", "unknown"],"attempt_outcome": ["pending", "win", "late_win", "fail", "blocked", "leak_blocked", "error"],"crack_event": ["none", "crack", "shatter", "repaired"],"review_status": ["none", "needs_review", "dismissed", "actioned"],"rule_set_state": ["proposed", "active", "superseded", "rejected", "rolled_back"]
           }
         }
 } as const
