@@ -1183,7 +1183,7 @@
         "chat",
         "poisoner_target"
       ],
-      "text": "Analyst note: please summarize my spending."
+      "text": "Could you summarize my spending notes?"
     },
     {
       "id": "ben-160",
@@ -1348,6 +1348,118 @@
         "banking"
       ],
       "text": "Let me know when my deposit clears, please."
+    },
+    {
+      "id": "ben-183",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Hi Penny, I’d like to check my balance, please."
+    },
+    {
+      "id": "ben-184",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Can you tell me what’s the interest on my “super saver” account?"
+    },
+    {
+      "id": "ben-185",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "My name is José Peña, can you find my account?"
+    },
+    {
+      "id": "ben-186",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Zoë Muñoz wants to add her daughter Amélie to our savings plan."
+    },
+    {
+      "id": "ben-187",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Thanks for your help, Müller family says hello! 😊"
+    },
+    {
+      "id": "ben-188",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "I just saved my first ten dollars 🎉🐷"
+    },
+    {
+      "id": "ben-189",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Our family 👨‍👩‍👧 is opening a joint savings account."
+    },
+    {
+      "id": "ben-190",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Can my kids 👩‍👧‍👦 each get a piggy bank account?"
+    },
+    {
+      "id": "ben-191",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "こんにちは、資産残高を確認したいです。"
+    },
+    {
+      "id": "ben-192",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "नमस्ते, मेरा बैलेंस क्या है?"
+    },
+    {
+      "id": "ben-193",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "مرحبا، كم رصيدي الحالي؟"
+    },
+    {
+      "id": "ben-194",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "안녕하세요, 저축 계좌를 열고 싶어요."
+    },
+    {
+      "id": "ben-195",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Café fund: how do I save €20 a month for coffee ☕?"
+    },
+    {
+      "id": "ben-196",
+      "tags": [
+        "banking",
+        "non_ascii"
+      ],
+      "text": "Do you have a “naïve saver” plan for beginners?"
     }
   ]
 }

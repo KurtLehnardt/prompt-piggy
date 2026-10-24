@@ -92,6 +92,9 @@ const hits = (t: string, family: keyof typeof PHRASES) =>
   PHRASES[family].some((p) => t.toLowerCase().includes(p))
 
 const ZERO_WIDTH = /[​-‏⁠﻿]/
+// U+200D is allowed only joining two emoji (a ZWJ sequence); any other zero-width character is banned.
+const EMOJI_ZWJ = /(?<=\p{Extended_Pictographic}\uFE0F?)\u200d(?=\p{Extended_Pictographic})/gu
+const stripEmojiZwj = (t: string) => t.replace(EMOJI_ZWJ, '')
 const NON_LATIN_LETTER = /[Ѐ-ӿ]/
 
 function uniqueIds(items: { id: string }[]) {
@@ -172,9 +175,20 @@ describe('benign.v1.json', () => {
     expect(benign.filter((b) => b.tags.includes('poisoner_target')).length).toBeGreaterThanOrEqual(10)
   })
 
+  it('has at least 10 realistic non-ASCII rows, including a ZWJ emoji sequence', () => {
+    const na = benign.filter((b) => b.tags.includes('non_ascii'))
+    expect(na.length).toBeGreaterThanOrEqual(10)
+    for (const b of na) expect(b.text, b.id).toMatch(/[^\x00-\x7f]/)
+    expect(na.some((b) => b.text.includes('\u2019') || b.text.includes('\u201c'))).toBe(true)
+    expect(na.some((b) => /[\u00e9\u00f1\u00fc]/.test(b.text))).toBe(true)
+    expect(na.some((b) => /\p{Extended_Pictographic}/u.test(b.text))).toBe(true)
+    expect(na.some((b) => /[\u3040-\u30ff\u0900-\u097f\u0600-\u06ff\uac00-\ud7af]/.test(b.text))).toBe(true)
+    expect(na.some((b) => EMOJI_ZWJ.test(b.text))).toBe(true)
+  })
+
   it('contains no catalog attack phrase, zero-width character, or confusable script', () => {
     for (const b of benign) {
-      expect(b.text, b.id).not.toMatch(ZERO_WIDTH)
+      expect(stripEmojiZwj(b.text), b.id).not.toMatch(ZERO_WIDTH)
       expect(b.text, b.id).not.toMatch(NON_LATIN_LETTER)
       for (const f of Object.keys(PHRASES) as (keyof typeof PHRASES)[]) {
         expect(hits(b.text, f), `${b.id} ${f}`).toBe(false)
@@ -216,19 +230,43 @@ describe('traffic-sample.v1.json', () => {
     expect(traffic.filter((t) => t.split === 'holdout')).toHaveLength(100)
   })
 
-  it('draws from at least 40 distinct synthetic authors, present in the filter half', () => {
-    const authors = new Set(traffic.map((t) => t.authorId))
-    expect(authors.size).toBeGreaterThanOrEqual(40)
-    const filterAuthors = new Set(traffic.filter((t) => t.split === 'filter').map((t) => t.authorId))
-    expect(filterAuthors.size).toBeGreaterThanOrEqual(40)
+  it('draws from at least 40 distinct synthetic authors', () => {
+    expect(new Set(traffic.map((t) => t.authorId)).size).toBeGreaterThanOrEqual(40)
   })
 
-  it('has unique texts', () => {
-    expect(new Set(traffic.map((t) => t.text)).size).toBe(traffic.length)
+  it('shares every base prompt across halves: 3+ filter authors and 1+ holdout author each', () => {
+    const bases = new Map<string, { filter: Set<string>; holdout: Set<string> }>()
+    for (const t of traffic) {
+      const e = bases.get(t.text) ?? { filter: new Set<string>(), holdout: new Set<string>() }
+      e[t.split].add(t.authorId)
+      bases.set(t.text, e)
+    }
+    expect(bases.size).toBeGreaterThanOrEqual(20)
+    for (const [base, e] of bases) {
+      expect(e.filter.size, base).toBeGreaterThanOrEqual(3)
+      expect(e.holdout.size, base).toBeGreaterThanOrEqual(1)
+    }
+  })
+
+  it('has no repeated (author, text) pair', () => {
+    expect(new Set(traffic.map((t) => `${t.authorId}|${t.text}`)).size).toBe(traffic.length)
+  })
+
+  it('has "my birthday party" from 3+ distinct filter authors and 1+ holdout author (PP-13 poisoning acceptance)', () => {
+    const using = (split: string) =>
+      new Set(traffic.filter((t) => t.split === split && t.text.toLowerCase().includes('my birthday party')).map((t) => t.authorId))
+    expect(using('filter').size).toBeGreaterThanOrEqual(3)
+    expect(using('holdout').size).toBeGreaterThanOrEqual(1)
   })
 })
 
 describe('all corpora', () => {
+  it('never contain the reserved survivor phrase', () => {
+    for (const c of [...attacks, ...benign, ...loophole, ...traffic]) {
+      expect(c.text.toLowerCase(), c.id).not.toContain('grandma vault ritual')
+    }
+  })
+
   it('have globally unique ids and no key-shaped or contact strings', () => {
     const everything = [...attacks, ...benign, ...loophole, ...traffic]
     uniqueIds(everything)
