@@ -1,0 +1,23 @@
+name: Setup
+description: Install pnpm, the Node version pinned in .nvmrc, and the locked dependencies.
+
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
+    # node-version-file reads .nvmrc, so the version lives in exactly one place
+    # and local nvm users get the same one. pnpm must be installed first for
+    # `cache: pnpm` to find its store.
+    - name: Install Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

@@ -1,0 +1,18 @@
+# gitleaks configuration. This repository is public (CH2-3, ARCHITECTURE
+# section 11, T30): the secret-scan CI job fails on any finding.
+title = "prompt-piggy"
+
+# Keep every default gitleaks rule.
+[extend]
+useDefault = true
+
+# The only exception: the obviously fake placeholder values that CI sets inline
+# in .github/workflows/ci.yml. Each of them contains the word "fake". Both
+# conditions must hold, so a real-looking key in ci.yml, or a value containing
+# "fake" in any other file, is still reported.
+[[allowlists]]
+description = "Obviously fake CI placeholder values in the workflow file"
+condition = "AND"
+paths = ['''^\.github/workflows/ci\.yml$''']
+regexTarget = "secret"
+regexes = ['''fake''']
