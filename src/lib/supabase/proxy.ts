@@ -176,7 +176,7 @@ function notConfigured(pathname: string): NextResponse {
   const headers = { 'cache-control': 'no-store' }
   if (isApiPath(pathname)) {
     return NextResponse.json(
-      { error: 'The service is not configured yet.', code: 'internal' },
+      { error: 'The service is not configured yet.', code: 'unavailable' },
       { status: 503, headers }
     )
   }
