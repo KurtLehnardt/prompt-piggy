@@ -193,7 +193,7 @@ const PT503_TOKENS = {
 } as const satisfies Record<string, ErrorCode>
 
 /** The Postgres default name of `unique (user_id, idempotency_key)` on public.attempts. */
-const ATTEMPT_KEY_CONSTRAINT = 'attempts_user_id_idempotency_key_key'
+const ATTEMPT_KEY_CONSTRAINT = 'attempts_user_idempotency_key'
 
 const DEFAULT_IN_FLIGHT_RETRY_SECONDS = 5
 const MAX_IN_FLIGHT_RETRY_SECONDS = 300
