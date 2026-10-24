@@ -3,6 +3,7 @@ import { REASON_TECHNIQUES, techniqueForDecisions, techniqueForReasons } from '@
 import { isDeepFrozen } from '@/lib/config/deep-freeze'
 import { DETECTOR_FAMILIES } from '@/lib/config/detector-families'
 import { ATTACK_TECHNIQUES, ENGINE_TECHNIQUES } from '@/lib/config/techniques'
+import { BLOCK_REASON_TECHNIQUES, blockTechnique, REASON_CODES } from '@/lib/validator/reasons'
 
 /** src/lib/ai/evaluator/labels.ts (docs/ARCHITECTURE.md section 8.2; CH-6b). */
 
@@ -21,9 +22,17 @@ describe('techniqueForReasons', () => {
     expect(isDeepFrozen(REASON_TECHNIQUES)).toBe(true)
   })
 
+  it("reuses PP-08's table and agrees with blockTechnique on every reason code", () => {
+    expect(REASON_TECHNIQUES).toBe(BLOCK_REASON_TECHNIQUES)
+    for (const code of [...REASON_CODES, 'replayed_breach' as const]) {
+      expect(techniqueForReasons([code])).toBe(blockTechnique([code]))
+    }
+  })
+
   it('uses the first mapped reason and falls back to unclassified', () => {
-    expect(techniqueForReasons(['too_long', 'delimiter', 'roleplay'])).toBe('delimiter_injection')
+    expect(techniqueForReasons(['delimiter', 'roleplay'])).toBe('delimiter_injection')
     expect(techniqueForReasons(['too_long'])).toBe('unclassified')
+    expect(techniqueForReasons(['not_a_code', 'roleplay'])).toBe('roleplay_persona')
     expect(techniqueForReasons([])).toBe('unclassified')
     expect(techniqueForReasons(['__proto__', 'constructor'])).toBe('unclassified')
     expect(techniqueForReasons(['replayed_breach', 'roleplay'])).toBe('unclassified')
