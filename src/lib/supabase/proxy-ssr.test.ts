@@ -22,11 +22,15 @@ const USER_ID = '00000000-0000-4000-8000-000000000001'
 const SESSION_ID = '00000000-0000-4000-8000-0000000000aa'
 
 const RS256 = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' } as const
+const HS256 = { name: 'HMAC', hash: 'SHA-256' } as const
 
 type KeyPair = { publicKey: webcrypto.CryptoKey; privateKey: webcrypto.CryptoKey }
 let projectKey: KeyPair
 let attackerKey: KeyPair
 let projectJwk: webcrypto.JsonWebKey & { kid: string; alg: string; use: string }
+// Stands in for a project's legacy JWT secret. auth-js never sees it: it cannot
+// check an HS256 token itself and asks the Auth server instead.
+let legacySecret: webcrypto.CryptoKey
 
 async function generateKey(): Promise<KeyPair> {
   return (await webcrypto.subtle.generateKey(
@@ -39,6 +43,7 @@ async function generateKey(): Promise<KeyPair> {
 beforeAll(async () => {
   projectKey = await generateKey()
   attackerKey = await generateKey()
+  legacySecret = (await webcrypto.subtle.generateKey(HS256, false, ['sign'])) as webcrypto.CryptoKey
   projectJwk = {
     ...(await webcrypto.subtle.exportKey('jwk', projectKey.publicKey)),
     kid: KID,
@@ -66,6 +71,25 @@ async function signJwt(key: webcrypto.CryptoKey, kid: string): Promise<string> {
     })
   )
   const signature = await webcrypto.subtle.sign(RS256, key, new TextEncoder().encode(`${header}.${payload}`))
+  return `${header}.${payload}.${base64url(new Uint8Array(signature))}`
+}
+
+/** A token like the ones a project on the legacy JWT secret issues: HS256 and no key id. */
+async function signHs256Jwt(): Promise<string> {
+  const now = Math.floor(Date.now() / 1000)
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const payload = base64url(
+    JSON.stringify({
+      iss: `${SUPABASE_URL}/auth/v1`,
+      sub: USER_ID,
+      aud: 'authenticated',
+      role: 'authenticated',
+      session_id: SESSION_ID,
+      iat: now,
+      exp: now + 3600,
+    })
+  )
+  const signature = await webcrypto.subtle.sign(HS256, legacySecret, new TextEncoder().encode(`${header}.${payload}`))
   return `${header}.${payload}.${base64url(new Uint8Array(signature))}`
 }
 
@@ -267,5 +291,39 @@ describe('real @supabase/ssr: a revoked session (valid signature, no session on 
       url = next
     }
     expect(visited).toEqual(['/play', '/login?next=%2Fplay'])
+  })
+})
+
+/**
+ * P2R-03: for an HS256 token, getClaims() itself asks the Auth server
+ * (getUser(token)), so the proxy does not ask a second time. The revoked-session
+ * test pins that auth-js behaviour: if getClaims() ever stopped asking, the
+ * proxy would let the revoked session onto /play and that test would fail.
+ */
+describe('real @supabase/ssr: a legacy HS256 session', () => {
+  const userRequests = () => requestedUrls.filter((url) => url === `${SUPABASE_URL}/auth/v1/user`)
+
+  it('lets the user onto /play with exactly one Auth server request', async () => {
+    const cookie = sessionCookie(await signHs256Jwt())
+    const page = await updateSession(request('/play', cookie))
+    expect(isPassThrough(page)).toBe(true)
+    expect(userRequests()).toHaveLength(1)
+    expect(requestedUrls).not.toContain(`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`)
+  })
+
+  it('sends the user from /login to /play with exactly one Auth server request', async () => {
+    const cookie = sessionCookie(await signHs256Jwt())
+    const login = await updateSession(request('/login', cookie))
+    expect(location(login)?.pathname).toBe(HOME_PATH)
+    expect(userRequests()).toHaveLength(1)
+  })
+
+  it('redirects a revoked session from /play to /login and then renders /login', async () => {
+    server.user = 'session_not_found'
+    const cookie = sessionCookie(await signHs256Jwt())
+    const page = await updateSession(request('/play', cookie))
+    expect(location(page)?.pathname).toBe(LOGIN_PATH)
+    const login = await updateSession(request('/login?next=%2Fplay', cookie))
+    expect(isPassThrough(login)).toBe(true)
   })
 })

@@ -66,32 +66,76 @@ function isApiPath(pathname: string): boolean {
 }
 
 /**
- * Returns `candidate` as a same-origin, path-only redirect target, or null.
- *
- * It accepts only a single leading "/" and rejects "//host", "/\host", an
- * encoded slash or backslash right after the leading "/", backslashes,
- * whitespace, and control characters anywhere, so neither a browser nor a later
- * decode can turn it into another origin. It also rejects /login (a signed-in
- * visitor would be sent back to /login forever) and /api paths (a JSON
- * response is never a page to return to). The result is normalized by the URL
- * parser and drops any fragment.
+ * Backslashes, whitespace (including Unicode spaces), and C0 and C1 control
+ * characters. The URL parser silently drops tab, CR, and LF and reads "\" as
+ * "/", so "/\t/evil.example" and "/\evil.example" would parse as "//evil.example".
  */
-export function safeNextPath(candidate: string | null | undefined): string | null {
-  if (!candidate || candidate.length > MAX_NEXT_LENGTH) return null
-  if (!candidate.startsWith('/') || candidate.startsWith('//')) return null
-  if (/[\\\s\u0000-\u001f\u007f]/.test(candidate)) return null
-  if (/^\/%(?:2f|5c)/i.test(candidate)) return null
+const UNSAFE_CHARACTER = /[\\\s\u0000-\u001f\u007f-\u009f]/
 
-  const base = 'https://next.invalid'
-  let parsed: URL
+/** A percent-encoded slash, backslash, or control character inside a path. */
+const UNSAFE_ENCODED_IN_PATH = /%(?:2f|5c|[01][0-9a-f]|7f)/i
+
+function parseUrl(input: string, base?: string): URL | null {
   try {
-    parsed = new URL(candidate, base)
+    return new URL(input, base)
   } catch {
     return null
   }
-  if (parsed.origin !== base) return null
+}
+
+/** Starts with exactly one "/", which a browser cannot read as "//host" or "/\host". */
+function hasSingleLeadingSlash(value: string): boolean {
+  return value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/\\')
+}
+
+/**
+ * Returns `candidate` as a path on `requestOrigin` that is safe to redirect
+ * to, or null.
+ *
+ * The URL parser normalizes the path: it removes dot segments, so
+ * "/.//evil.example", "/%2e//evil.example", and "/a/..//evil.example" all come
+ * out as "//evil.example", which a browser reads as another host. So the
+ * checks run twice: on the raw candidate, before the parser can drop or
+ * rewrite characters, and again on the normalized pathname and search that are
+ * actually returned. The result is accepted only when it starts with a single
+ * "/", contains no backslash, whitespace, control character, or encoded slash,
+ * backslash, or control character in its path, and parses back to itself on
+ * `requestOrigin`.
+ *
+ * It also rejects /login (a signed-in visitor would be sent back to /login
+ * forever) and /api paths (a JSON response is never a page to return to). Any
+ * fragment is dropped.
+ */
+export function safeNextPath(
+  candidate: string | null | undefined,
+  requestOrigin: string
+): string | null {
+  if (!candidate || candidate.length > MAX_NEXT_LENGTH) return null
+  if (UNSAFE_CHARACTER.test(candidate) || !hasSingleLeadingSlash(candidate)) return null
+
+  const origin = parseUrl(requestOrigin)?.origin
+  if (!origin || origin === 'null') return null
+
+  const parsed = parseUrl(candidate, origin)
+  if (!parsed || parsed.origin !== origin) return null
+
+  // Check the output, not only the input.
+  const target = parsed.pathname + parsed.search
+  if (
+    target.length > MAX_NEXT_LENGTH ||
+    !hasSingleLeadingSlash(target) ||
+    UNSAFE_CHARACTER.test(target) ||
+    UNSAFE_ENCODED_IN_PATH.test(parsed.pathname)
+  ) {
+    return null
+  }
+  const reparsed = parseUrl(target, origin)
+  if (!reparsed || reparsed.origin !== origin || reparsed.pathname + reparsed.search !== target) {
+    return null
+  }
+
   if (matchesBoundary(parsed.pathname, LOGIN_PATH) || isApiPath(parsed.pathname)) return null
-  return parsed.pathname + parsed.search
+  return target
 }
 
 /**
@@ -161,6 +205,20 @@ async function confirmUser(auth: AuthUserLookup): Promise<boolean> {
 }
 
 /**
+ * True when getClaims() could not check the token locally and asked the Auth
+ * server instead, through getUser(token). auth-js does that for a token with no
+ * algorithm, a symmetric (HS*) algorithm, or no key id, which is what projects
+ * on the legacy JWT secret issue. A success then already means the session
+ * exists, so confirmUser would only repeat the same request. Any other header,
+ * or none, returns false, so the proxy asks. proxy-ssr.test.ts pins this
+ * auth-js behaviour with a revoked HS256 session.
+ */
+function claimsCameFromAuthServer(header: { alg?: string; kid?: string } | undefined): boolean {
+  if (!header) return false
+  return !header.alg || header.alg.startsWith('HS') || !header.kid
+}
+
+/**
  * Refreshes the Supabase session cookie on every matched request and gates
  * pages that need a user. It is called only from src/proxy.ts.
  *
@@ -170,6 +228,7 @@ async function confirmUser(auth: AuthUserLookup): Promise<boolean> {
  */
 export async function updateSession(request: NextRequest): Promise<NextResponse> {
   const pathname = request.nextUrl.pathname
+  const origin = request.nextUrl.origin
   const isPublic = isPublicPath(pathname)
   const isApi = isApiPath(pathname)
   const isLogin = pathname === LOGIN_PATH
@@ -210,9 +269,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // the access token's signature and expiry, so a forged cookie never counts as
   // a user.
   let hasClaims = false
+  let confirmedByAuthServer = false
   try {
     const { data } = await supabase.auth.getClaims()
     hasClaims = typeof data?.claims?.sub === 'string'
+    confirmedByAuthServer = hasClaims && claimsCameFromAuthServer(data?.header)
   } catch {
     // Fail closed: if the session cannot be verified, treat the visitor as
     // signed out. Public paths still work.
@@ -232,8 +293,11 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   // the user with getUser() itself and answers 401 JSON, which cannot loop.
   // When getUser() finds the session gone, it clears the session cookies
   // through setAll, and carrySession() copies that onto the redirect.
+  // This costs one Auth round trip per protected page request, including
+  // prefetches. It is skipped only when getClaims() already made that same
+  // request (claimsCameFromAuthServer), so no request asks twice.
   let signedIn = hasClaims
-  if (hasClaims && (isLogin || (!isPublic && !isApi))) {
+  if (hasClaims && !confirmedByAuthServer && (isLogin || (!isPublic && !isApi))) {
     signedIn = await confirmUser(supabase.auth)
   }
 
@@ -245,15 +309,19 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
         NextResponse.json({ error: 'Sign in required.', code: 'unauthorized' }, { status: 401 })
       )
     }
-    const loginUrl = new URL(LOGIN_PATH, request.nextUrl.origin)
-    const next = safeNextPath(pathname + request.nextUrl.search)
+    const loginUrl = new URL(LOGIN_PATH, origin)
+    const next = safeNextPath(pathname + request.nextUrl.search, origin)
     if (next) loginUrl.searchParams.set(NEXT_PARAM, next)
     return carrySession(response, NextResponse.redirect(loginUrl))
   }
 
   if (signedIn && isLogin) {
-    const target = safeNextPath(request.nextUrl.searchParams.get(NEXT_PARAM)) ?? HOME_PATH
-    return carrySession(response, NextResponse.redirect(new URL(target, request.nextUrl.origin)))
+    const next = safeNextPath(request.nextUrl.searchParams.get(NEXT_PARAM), origin)
+    let destination = new URL(next ?? HOME_PATH, origin)
+    // safeNextPath already guarantees a same-origin path; this is a second
+    // check on the URL that is actually sent.
+    if (destination.origin !== origin) destination = new URL(HOME_PATH, origin)
+    return carrySession(response, NextResponse.redirect(destination))
   }
 
   return response

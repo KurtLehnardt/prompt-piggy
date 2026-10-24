@@ -1,7 +1,8 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { resolveSupabaseSecretKey, resolveSupabaseUrl } from '@/lib/supabase/env'
+import { resolveSupabaseUrl } from '@/lib/supabase/env'
+import { resolveSupabaseSecretKey } from '@/lib/supabase/env.server'
 
 /**
  * Secret-key (service-role) Supabase client. It bypasses row-level security,

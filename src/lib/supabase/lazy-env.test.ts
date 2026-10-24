@@ -30,6 +30,7 @@ describe('importing with an empty environment', () => {
     ['admin', () => import('./admin')],
     ['proxy', () => import('./proxy')],
     ['env', () => import('./env')],
+    ['env.server', () => import('./env.server')],
   ])('%s imports without throwing', async (_name, load) => {
     await expect(load()).resolves.toBeDefined()
   })
@@ -94,7 +95,7 @@ describe('environment variable names', () => {
     ],
   ])('the secret key resolves from %s', async (_label, env, expectedName) => {
     for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
-    const { resolveSupabaseSecretKey } = await import('./env')
+    const { resolveSupabaseSecretKey } = await import('./env.server')
     expect(resolveSupabaseSecretKey()?.name).toBe(expectedName)
   })
 

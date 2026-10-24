@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import {
   resolveSupabasePublishableKey,
-  resolveSupabaseSecretKey,
   resolveSupabaseUrl,
 } from "@/lib/supabase/env";
+import { resolveSupabaseSecretKey } from "@/lib/supabase/env.server";
 
 /**
  * Public deploy check (ARCHITECTURE section 4). It is rendered on every request

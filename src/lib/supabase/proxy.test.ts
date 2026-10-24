@@ -9,6 +9,9 @@ type CookieMethods = {
 
 const ssr = vi.hoisted(() => ({
   claimsSub: null as string | null,
+  // The JWT header getClaims() returns. undefined leaves it out, as older
+  // auth-js versions did.
+  claimsHeader: undefined as { alg?: string; kid?: string; typ?: string } | undefined,
   getClaimsThrows: false,
   // What the Auth server says about the session behind the claims. null means
   // the session was revoked (signed out elsewhere) or the user was deleted.
@@ -45,7 +48,7 @@ function fakeServerClient(_url: string, _key: string, options: { cookies: Cookie
           options.cookies.setAll(ssr.cookiesToSetOnRefresh)
         }
         return ssr.claimsSub
-          ? { data: { claims: { sub: ssr.claimsSub } }, error: null }
+          ? { data: { claims: { sub: ssr.claimsSub }, header: ssr.claimsHeader }, error: null }
           : { data: null, error: null }
       },
       async getUser() {
@@ -114,6 +117,7 @@ async function follow(path: string, maxHops = 5) {
 
 beforeEach(() => {
   ssr.claimsSub = null
+  ssr.claimsHeader = undefined
   ssr.getClaimsThrows = false
   ssr.userId = null
   ssr.getUserThrows = false
@@ -266,6 +270,31 @@ describe('protected pages', () => {
     expect(ssr.getUserCalls).toBe(0)
   })
 
+  it.each([
+    ['HS256 with no key id', { alg: 'HS256', typ: 'JWT' }],
+    ['HS256 with a key id', { alg: 'HS256', kid: 'legacy', typ: 'JWT' }],
+    ['RS256 with no key id', { alg: 'RS256', typ: 'JWT' }],
+  ])(
+    'does not ask the Auth server again when getClaims() already did (%s)',
+    async (_label, header) => {
+      signIn()
+      ssr.claimsHeader = header
+      expect(isPassThrough(await updateSession(request('/play')))).toBe(true)
+      expect(redirectPath(await updateSession(request('/login')))).toBe(HOME_PATH)
+      expect(ssr.getUserCalls).toBe(0)
+    }
+  )
+
+  it.each([
+    ['an asymmetric key with a key id', { alg: 'ES256', kid: 'fake-kid', typ: 'JWT' }],
+    ['no header', undefined],
+  ])('still confirms with the Auth server for %s', async (_label, header) => {
+    revokeSession()
+    ssr.claimsHeader = header
+    expect(redirectPath(await updateSession(request('/play')))).toBe(LOGIN_PATH)
+    expect(ssr.getUserCalls).toBe(1)
+  })
+
   it('treats a getClaims failure as signed out', async () => {
     ssr.getClaimsThrows = true
     const page = await updateSession(request('/play'))
@@ -332,9 +361,12 @@ describe('safeNextPath', () => {
     ['/play?tab=wallet', '/play?tab=wallet'],
     ['/live', '/live'],
     ['/play/../admin', '/admin'],
+    ['/play/./wallet', '/play/wallet'],
     ['/play#section', '/play'],
+    ['/play?x=//evil', '/play?x=//evil'],
+    ['/play?ref=%2Fhome', '/play?ref=%2Fhome'],
   ])('accepts %s as %s', (input, expected) => {
-    expect(safeNextPath(input)).toBe(expected)
+    expect(safeNextPath(input, ORIGIN)).toBe(expected)
   })
 
   it.each([
@@ -351,14 +383,106 @@ describe('safeNextPath', () => {
     'javascript:alert(1)',
     '/play\nLocation: https://evil.example',
     '/play\t',
+    '/play\u0085',
+    '/play\u00a0',
+    // The URL parser removes dot segments, so each of these would come out as
+    // "//evil.example" (P2R-01).
+    '/.//evil.example',
+    '/%2e//evil.example',
+    '/%2E%2E//evil.example',
+    '/a/..//evil.example',
+    '/a/%2e%2e//evil.example',
+    '/./%2Fevil.example',
+    '/./%5Cevil.example',
+    '/.//login',
+    '/%2e%2e/login',
+    '/./api/attempts',
+    '/play/%2F%2Fevil.example',
+    '/play/%0d%0aLocation:evil',
     '/login',
     '/login/',
     '/login?next=/play',
     '/api/attempts',
     `/${'a'.repeat(2048)}`,
   ])('rejects %j', (input) => {
-    expect(safeNextPath(input)).toBeNull()
+    expect(safeNextPath(input, ORIGIN)).toBeNull()
   })
+
+  it.each(['', 'not a url', 'null'])('rejects every candidate for the unusable origin %j', (origin) => {
+    expect(safeNextPath('/play', origin)).toBeNull()
+  })
+
+  it('returns a path that stays on the request origin, whatever that origin is', () => {
+    expect(safeNextPath('/.//evil.example', 'http://localhost:3000')).toBeNull()
+    expect(safeNextPath('/play', 'http://localhost:3000')).toBe('/play')
+  })
+})
+
+/**
+ * P2R-01: every crafted `next` must either become a path on the request origin
+ * or be dropped. These run the real updateSession (only @supabase/ssr is
+ * mocked) and check the Location header the browser would follow.
+ */
+describe('open redirect: crafted next values', () => {
+  const DROP = HOME_PATH
+  const cases: [label: string, next: string, expected: string][] = [
+    ['dot segment', '/.//evil.example', DROP],
+    ['encoded dot segment', '/%2e//evil.example', DROP],
+    ['encoded double dot segment', '/%2E%2E//evil.example', DROP],
+    ['parent segment', '/a/..//evil.example', DROP],
+    ['protocol-relative', '//evil.example', DROP],
+    ['slash backslash', '/\\evil.example', DROP],
+    ['backslash slash', '\\/evil.example', DROP],
+    ['encoded backslash', '/%5Cevil.example', DROP],
+    ['absolute URL', 'https://evil.example', DROP],
+    ['encoded tab', '/%09/evil.example', DROP],
+    ['tab', '/\t/evil.example', DROP],
+    ['CR LF', '/\r\n/evil.example', DROP],
+    ['javascript: URL', 'javascript:alert(1)', DROP],
+    ['slashes in the query only', '/play?x=//evil', '/play?x=//evil'],
+  ]
+
+  function expectSameOriginRedirect(response: NextResponse, expected: string) {
+    expect(response.status).toBe(307)
+    const location = new URL(response.headers.get('location')!)
+    expect(location.origin).toBe(ORIGIN)
+    expect(location.pathname.startsWith('//')).toBe(false)
+    expect(location.pathname + location.search).toBe(expected)
+  }
+
+  it.each(cases)(
+    'a signed-in visitor on /login?next=<%s, encoded> goes to a same-origin path',
+    async (_label, next, expected) => {
+      signIn()
+      const response = await updateSession(request(`/login?${NEXT_PARAM}=${encodeURIComponent(next)}`))
+      expectSameOriginRedirect(response, expected)
+    }
+  )
+
+  it.each(cases)(
+    'a signed-in visitor on /login?next=<%s, typed as is> goes to a same-origin path',
+    async (_label, next, expected) => {
+      signIn()
+      const response = await updateSession(new NextRequest(`${ORIGIN}/login?${NEXT_PARAM}=${next}`))
+      expectSameOriginRedirect(response, expected)
+    }
+  )
+
+  it.each(cases.filter(([, next]) => /^[/\\]/.test(next)))(
+    'a signed-out visitor on the path <%s> gets a login link whose next stays on the origin',
+    async (_label, next) => {
+      const response = await updateSession(new NextRequest(`${ORIGIN}${next}`))
+      expect(redirectPath(response)).toBe(LOGIN_PATH)
+      const carried = redirectNext(response)
+      signIn()
+      const login = await updateSession(
+        request(carried === null ? LOGIN_PATH : `${LOGIN_PATH}?${NEXT_PARAM}=${encodeURIComponent(carried)}`)
+      )
+      const location = new URL(login.headers.get('location')!)
+      expect(location.origin).toBe(ORIGIN)
+      expect(location.pathname.startsWith('//')).toBe(false)
+    }
+  )
 })
 
 describe('session refresh', () => {

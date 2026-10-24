@@ -130,8 +130,13 @@ jobs:
       #   repository refuses to have one at all.
       # - On a pull request, the scan uses .gitleaks.toml from the base branch,
       #   so a change to the allowlist only takes effect after it has been
-      #   reviewed and merged on its own. Before the base branch has a config
-      #   (the first pull request), it uses the tree's config.
+      #   reviewed and merged on its own. This fails closed: if the base branch
+      #   cannot be read, the job fails instead of falling back to the pull
+      #   request's own config. If the base branch exists but has no config yet
+      #   (the pull request that first adds one), the scan uses gitleaks'
+      #   default rules with no allowlist, which is stricter than any config.
+      # - --config is always passed, because without it gitleaks would read the
+      #   checked-out .gitleaks.toml by itself.
       - name: Choose the gitleaks config
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -143,13 +148,35 @@ jobs:
             exit 1
           fi
           config="$RUNNER_TEMP/gitleaks.toml"
-          if [ "$EVENT_NAME" = "pull_request" ] && git cat-file -e "origin/${BASE_REF}:.gitleaks.toml" 2>/dev/null; then
-            git show "origin/${BASE_REF}:.gitleaks.toml" > "$config"
-            if ! git diff --quiet "origin/${BASE_REF}" HEAD -- .gitleaks.toml; then
-              echo "::warning file=.gitleaks.toml::This pull request changes .gitleaks.toml. It is scanned with the config from ${BASE_REF}; the change takes effect once merged."
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            if [ -z "$BASE_REF" ]; then
+              echo "::error::This pull request has no base branch name, so the base .gitleaks.toml cannot be read."
+              exit 1
             fi
-            echo "Using .gitleaks.toml from origin/${BASE_REF}."
+            base="origin/${BASE_REF}"
+            if ! git rev-parse --verify --quiet "${base}^{commit}" > /dev/null; then
+              echo "::error::${base} was not fetched, so its .gitleaks.toml cannot be read. Refusing to fall back to this pull request's config."
+              exit 1
+            fi
+            # ls-tree fails if the base tree cannot be read, and set -e then
+            # fails the job. An empty listing means the file is not there.
+            listing="$(git ls-tree --name-only "$base" -- .gitleaks.toml)"
+            if [ "$listing" = ".gitleaks.toml" ]; then
+              git show "${base}:.gitleaks.toml" > "$config"
+              if ! git diff --quiet "$base" HEAD -- .gitleaks.toml; then
+                echo "::warning file=.gitleaks.toml::This pull request changes .gitleaks.toml. It is scanned with the config from ${BASE_REF}; the change takes effect once merged."
+              fi
+              echo "Using .gitleaks.toml from ${base}."
+            else
+              printf '%s\n' 'title = "gitleaks default rules, no allowlist"' '' '[extend]' 'useDefault = true' > "$config"
+              if [ -e .gitleaks.toml ]; then
+                echo "::warning file=.gitleaks.toml::${BASE_REF} has no .gitleaks.toml yet, so this pull request is scanned with gitleaks' default rules and no allowlist. Its .gitleaks.toml takes effect once merged."
+              fi
+              echo "Using gitleaks' default rules with no allowlist: ${base} has no .gitleaks.toml."
+            fi
           else
+            # A push to main: the checked-out tree is main itself. cp fails,
+            # and so does the job, if the file is missing.
             cp .gitleaks.toml "$config"
             echo "Using .gitleaks.toml from the checked-out tree."
           fi

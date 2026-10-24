@@ -1,25 +1,27 @@
 /**
- * Supabase settings, read when a client is created and never when a module is
- * imported (REVIEW-1 R1-14). A fresh Vercel import therefore builds before any
- * environment variable is configured.
+ * Public Supabase settings, read when a client is created and never when a
+ * module is imported (REVIEW-1 R1-14). A fresh Vercel import therefore builds
+ * before any environment variable is configured.
  *
  * Every setting accepts the name that the Supabase Vercel integration syncs
  * first, then the legacy name from ARCHITECTURE section 13:
  *
  * - URL: NEXT_PUBLIC_SUPABASE_URL
  * - Publishable key: NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, then NEXT_PUBLIC_SUPABASE_ANON_KEY
- * - Secret key: SUPABASE_SECRET_KEY, then SUPABASE_SERVICE_ROLE_KEY
  *
  * Each variable is read with a literal `process.env.NAME` expression, because
- * that is the only form Next.js inlines into the browser bundle. The secret key
- * has no NEXT_PUBLIC_ prefix, so Next.js never inlines its value anywhere, and
- * only the server-only admin client and the health page call its reader.
+ * that is the only form Next.js inlines into the browser bundle.
+ *
+ * This module is imported by the browser client, so it holds public settings
+ * only. The secret key is read in env.server.ts, which is `server-only`.
+ * secret-key-boundary.test.ts fails if this file ever names it.
  */
 
 /** A resolved setting: its value and the name of the variable it came from. */
 export type ResolvedSetting<Name extends string> = { name: Name; value: string }
 
-function firstSet<Name extends string>(
+/** Returns the first candidate with a non-empty value. */
+export function firstSet<Name extends string>(
   candidates: readonly (readonly [Name, string | undefined])[]
 ): ResolvedSetting<Name> | null {
   for (const [name, value] of candidates) {
@@ -36,14 +38,6 @@ export function resolveSupabasePublishableKey() {
   return firstSet([
     ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY],
     ['NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY],
-  ] as const)
-}
-
-/** Server only. Callers must never send the returned value to a browser. */
-export function resolveSupabaseSecretKey() {
-  return firstSet([
-    ['SUPABASE_SECRET_KEY', process.env.SUPABASE_SECRET_KEY],
-    ['SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY],
   ] as const)
 }
 

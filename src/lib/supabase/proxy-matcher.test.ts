@@ -99,6 +99,27 @@ describe('src/proxy.ts matcher', () => {
     expect(runsOn(path)).toBe(false)
   })
 
+  it.each([
+    '/api/icon',
+    '/api/attempts/icon',
+    '/api/admin/players/icon/hide',
+    '/api/live/icon',
+    '/api/opengraph-image',
+    '/api/players/twitter-image/1',
+    '/api/sitemap.xml',
+    '/api/admin/sitemap/0.xml',
+    '/api/avatars/fake-id.png',
+  ])('still runs on the protected API route %s (P2R-04)', (path) => {
+    expect(runsOn(path)).toBe(true)
+  })
+
+  it.each(['/favicon.icox', '/favicon.ico/x', '/_next/staticx', '/_next/imagex', '/_next/image/x'])(
+    'still runs on the unanchored look-alike %s',
+    (path) => {
+      expect(runsOn(path)).toBe(true)
+    }
+  )
+
   it.each(['/iconography', '/icons', '/robots.txt.bak', '/manifest', '/opengraph-imagery'])(
     'still runs on the look-alike %s',
     (path) => {

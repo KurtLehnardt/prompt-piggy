@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { importSpecifiers, stripComments } from '@/test/source-imports'
 
 /**
  * HC-A4: the Dynamic Validator and every other piece of game logic run in the
@@ -11,26 +12,6 @@ const root = path.resolve(__dirname, '../../..')
 
 function read(relativePath: string): string {
   return readFileSync(path.join(root, relativePath), 'utf8')
-}
-
-function stripComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-}
-
-function importSpecifiers(source: string): string[] {
-  const code = stripComments(source)
-  const patterns = [
-    /\bimport\s+(?:type\s+)?[\s\S]*?\sfrom\s*['"]([^'"]+)['"]/g,
-    /\bimport\s*['"]([^'"]+)['"]/g,
-    /\bexport\s+(?:type\s+)?[\s\S]*?\sfrom\s*['"]([^'"]+)['"]/g,
-    /\bimport\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g,
-    /\brequire\s*\(\s*['"`]([^'"`]+)['"`]\s*\)/g,
-  ]
-  const found = new Set<string>()
-  for (const pattern of patterns) {
-    for (const match of code.matchAll(pattern)) found.add(match[1])
-  }
-  return [...found].sort()
 }
 
 describe('src/proxy.ts scope (HC-A4)', () => {

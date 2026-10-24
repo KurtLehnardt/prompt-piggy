@@ -26,6 +26,7 @@
    - Node.js Version: **22.x**. `package.json` also pins `"engines": { "node": "22.x" }`.
    - Install Command, Build Command, and Output Directory: leave every **Override** toggle off. With an Install Command override, Vercel uses its oldest pnpm (pnpm 6), which cannot read this lockfile. Without one, Vercel picks the pnpm version from the lockfile.
 2. Add the Supabase integration from the Vercel Marketplace so the Supabase environment variables sync automatically. The app reads the names it syncs, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`, and falls back to the legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` when the new names are unset. Do not set `NODE_ENV`. The `/health` page shows which name each setting was read from.
+   - Redeploy after adding or changing any Supabase variable. Next.js inlines `NEXT_PUBLIC_*` values at build time, into the browser bundle and the proxy, so a running deployment keeps the old values until it is rebuilt.
 3. Set the function region to match the Supabase project region.
 4. Add the Vercel production URL and the preview URL pattern to:
    - Supabase Auth: URL Configuration (Site URL and Redirect URLs)
