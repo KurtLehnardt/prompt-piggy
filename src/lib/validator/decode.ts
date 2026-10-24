@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import { deepFreeze } from '@/lib/config/deep-freeze'
 import { fold } from '@/lib/security/fold'
 import { WHITESPACE } from '@/lib/validator/detector-phrases'
+import { isAscii } from '@/lib/validator/normalize'
 import type { DecodedRun, DecodeKind } from '@/lib/validator/types'
 
 /**
@@ -170,16 +171,22 @@ function alphabetRuns(text: string, out: Candidate[]): void {
   }
 }
 
+function isSpace(text: string, index: number): boolean {
+  const code = text.charCodeAt(index)
+  if (code < 0x80) return code === 0x20 || (code >= 0x09 && code <= 0x0d)
+  return WHITESPACE.test(text[index])
+}
+
 /** URL-encoded runs: whitespace-delimited chunks with enough %XX escapes. */
 function urlRuns(text: string, out: Candidate[]): void {
   let index = 0
   while (index < text.length && out.length < DECODE_LIMITS.maxCandidates * 4) {
-    if (WHITESPACE.test(text[index])) {
+    if (isSpace(text, index)) {
       index += 1
       continue
     }
     const start = index
-    while (index < text.length && !WHITESPACE.test(text[index])) index += 1
+    while (index < text.length && !isSpace(text, index)) index += 1
     const chunk = text.slice(start, index)
     if (chunk.includes('%') && urlEscapes(chunk) >= DECODE_LIMITS.minUrlEscapes) {
       out.push({ start, kind: 'url', text: chunk })
@@ -260,7 +267,7 @@ export function decodeProbes(input: string): DecodedRun[] {
   if (typeof input !== 'string' || input.length === 0) return []
   let text: string
   try {
-    text = fold(input)
+    text = isAscii(input) ? input : fold(input)
   } catch {
     return []
   }

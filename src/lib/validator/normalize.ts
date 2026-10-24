@@ -47,14 +47,32 @@ export const NORMALIZE_STEPS = deepFreeze([
   'whitespace',
 ] as const)
 
+/** True for an ASCII letter or digit. ASCII is checked by code before any regex, for speed. */
+function isAsciiAlnum(code: number): boolean {
+  return (code >= 0x61 && code <= 0x7a) || (code >= 0x41 && code <= 0x5a) || (code >= 0x30 && code <= 0x39)
+}
+
+/** True for a letter, mark, or digit in any script. */
+export function isWordChar(char: string): boolean {
+  const code = char.charCodeAt(0)
+  if (code < 0x80) return isAsciiAlnum(code)
+  return WORD_CHAR.test(char)
+}
+
 /** Removes combining marks and default-ignorable characters from NFKD text. */
 function stripMarksAndIgnorables(text: string): string {
   let out = ''
   for (const char of text.normalize('NFKD')) {
-    if (COMBINING_MARK.test(char) || DEFAULT_IGNORABLE.test(char)) continue
+    if (char.charCodeAt(0) >= 0x80 && (COMBINING_MARK.test(char) || DEFAULT_IGNORABLE.test(char))) continue
     out += char
   }
   return out
+}
+
+function isWhitespace(char: string): boolean {
+  const code = char.charCodeAt(0)
+  if (code < 0x80) return code === 0x20 || (code >= 0x09 && code <= 0x0d)
+  return WHITESPACE.test(char)
 }
 
 /** Collapses whitespace runs: one with a line break becomes `\n`, others a space. */
@@ -62,7 +80,7 @@ function collapseWhitespace(text: string): string {
   let out = ''
   let pending: '' | ' ' | '\n' = ''
   for (const char of text) {
-    if (WHITESPACE.test(char)) {
+    if (isWhitespace(char)) {
       if (char === '\n' || char === '\r' || char === ' ' || char === ' ' || char === '\v' || char === '\f') {
         pending = '\n'
       } else if (pending === '') {
@@ -82,7 +100,7 @@ export function tokenize(text: string): string[] {
   const tokens: string[] = []
   let current = ''
   for (const char of text) {
-    if (WORD_CHAR.test(char)) {
+    if (isWordChar(char)) {
       current += char
     } else if (current !== '') {
       tokens.push(current)
@@ -103,9 +121,23 @@ export function skeletonOf(text: string): string {
   return out
 }
 
+/**
+ * True when every code unit is ASCII. For such text NFKC, NFKD, and NFC are
+ * the identity, and it has no zero-width character, look-alike, combining
+ * mark, or default-ignorable character, so normalization reduces to
+ * casefolding and whitespace collapse. The fast path gives the same result.
+ */
+export function isAscii(text: string): boolean {
+  for (let index = 0; index < text.length; index += 1) {
+    if (text.charCodeAt(index) >= 0x80) return false
+  }
+  return true
+}
+
 /** The normalized string form only (section 8.1). */
 export function normalizeText(input: string): string {
   if (typeof input !== 'string') throw new TypeError('normalize() needs a string.')
+  if (isAscii(input)) return collapseWhitespace(input.toLowerCase())
   const folded = fold(input)
   const stripped = stripMarksAndIgnorables(folded)
   const refolded = foldConfusables(stripped)
@@ -123,6 +155,8 @@ export function normalize(input: string): NormalizedText {
   return { text, tokens: tokenize(text), skeleton: skeletonOf(text) }
 }
 
+Object.freeze(isAscii)
+Object.freeze(isWordChar)
 Object.freeze(tokenize)
 Object.freeze(skeletonOf)
 Object.freeze(normalizeText)

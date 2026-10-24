@@ -158,6 +158,19 @@ export function detectMixedScript(input: string): boolean {
   for (let index = 0; index < chars.length; index += 1) {
     const char = chars[index]
     const codePoint = char.codePointAt(0) as number
+    if (codePoint < 0x80) {
+      const asciiLetter = (codePoint >= 0x61 && codePoint <= 0x7a) || (codePoint >= 0x41 && codePoint <= 0x5a)
+      if (asciiLetter) {
+        wordHasAscii = true
+        asciiLetters += 1
+        letters += 1
+        if (wordHasOtherScript) return true
+      } else if (!(codePoint >= 0x30 && codePoint <= 0x39)) {
+        wordHasAscii = false
+        wordHasOtherScript = false
+      }
+      continue
+    }
     if (isInvisible(codePoint)) {
       if (!isOrdinaryJoiner(chars, index)) return true
       continue
