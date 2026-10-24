@@ -7,13 +7,20 @@
 -- The tests stay valid as later migrations land: they never assert the total
 -- number of app_config keys, and they upsert the profiles they need, because
 -- PP-12's sign-up trigger creates a profile for every new auth.users row.
+--
+-- One check is generic on purpose (PR #3 review, H1): it enumerates every
+-- table and sequence in public and private, including those of later
+-- migrations, and fails if service_role lacks its explicit grants. 00001
+-- revokes every default privilege of service_role, so a migration that
+-- forgets the grant fails here, locally and in CI, instead of failing with
+-- 42501 on a hosted project.
 
 begin;
 
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(114);
+select plan(121);
 
 -- ---------------------------------------------------------------------------
 -- Helpers and fixtures
@@ -34,6 +41,45 @@ as $$
   ) as p (privilege)
   where has_table_privilege(p_role, p_table, p.privilege);
 $$;
+
+-- Every privilege service_role is missing on a table or sequence in public or
+-- private: tables need SELECT, INSERT, UPDATE, and DELETE, and sequences need
+-- USAGE and SELECT. Extension-owned objects are skipped. No rows means none
+-- is missing.
+create function pg_temp.service_role_privilege_gaps()
+returns table (relation text, privilege text)
+language sql
+stable
+as $$
+  select format('%I.%I', n.nspname, c.relname) collate "default", p.privilege collate "default"
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  cross join lateral unnest(
+    case when c.relkind = 'S'
+         then array['USAGE', 'SELECT']
+         else array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] end
+  ) as p (privilege)
+  where n.nspname in ('public', 'private')
+    and c.relkind in ('r', 'p', 'S')
+    and not exists (
+      select 1 from pg_depend d
+      where d.classid = 'pg_class'::regclass and d.objid = c.oid and d.deptype = 'e'
+    )
+    and not case when c.relkind = 'S'
+                 then has_sequence_privilege('service_role', c.oid, p.privilege)
+                 else has_table_privilege('service_role', c.oid, p.privilege) end
+  order by 1, 2;
+$$;
+
+-- ---------------------------------------------------------------------------
+-- Explicit service_role grants on every table and sequence (H1): 1 test
+-- ---------------------------------------------------------------------------
+-- Runs before this file creates any object of its own, so it sees exactly the
+-- tables and sequences that the migrations created.
+select is_empty(
+  $$ select relation || ' lacks ' || privilege from pg_temp.service_role_privilege_gaps() $$,
+  'H1: every table in public and private grants SELECT, INSERT, UPDATE, and DELETE to service_role, and every sequence grants USAGE and SELECT, explicitly'
+);
 
 -- Two users, A and B, with synthetic addresses.
 insert into auth.users (id, aud, role, email)
@@ -126,7 +172,7 @@ select ok(
 );
 
 -- ---------------------------------------------------------------------------
--- Default privileges: objects created after 00001 (skylite 00035, R1-19): 10 tests
+-- Default privileges: objects created after 00001 (skylite 00035, R1-19, H1): 16 tests
 -- ---------------------------------------------------------------------------
 create table public.zz_pp03_after_00001 (
   id integer generated always as identity primary key,
@@ -141,9 +187,9 @@ select is(
   pg_temp.held_table_privileges('authenticated', 'public.zz_pp03_after_00001'), null::text[],
   'a table created after 00001 grants nothing to authenticated'
 );
-select ok(
-  pg_temp.held_table_privileges('service_role', 'public.zz_pp03_after_00001') @> array['DELETE', 'INSERT', 'SELECT', 'UPDATE'],
-  'a table created after 00001 grants SELECT, INSERT, UPDATE, and DELETE to service_role'
+select is(
+  pg_temp.held_table_privileges('service_role', 'public.zz_pp03_after_00001'), null::text[],
+  'H1: a table created after 00001 inherits no default privilege for service_role either'
 );
 select ok(
   not has_sequence_privilege('anon', pg_get_serial_sequence('public.zz_pp03_after_00001', 'id'), 'USAGE')
@@ -156,6 +202,56 @@ select ok(
     and not has_sequence_privilege('authenticated', pg_get_serial_sequence('public.zz_pp03_after_00001', 'id'), 'SELECT')
     and not has_sequence_privilege('authenticated', pg_get_serial_sequence('public.zz_pp03_after_00001', 'id'), 'UPDATE'),
   'a sequence created after 00001 grants nothing to authenticated'
+);
+select ok(
+  not has_sequence_privilege('service_role', pg_get_serial_sequence('public.zz_pp03_after_00001', 'id'), 'USAGE')
+    and not has_sequence_privilege('service_role', pg_get_serial_sequence('public.zz_pp03_after_00001', 'id'), 'SELECT'),
+  'H1: a sequence created after 00001 inherits no default privilege for service_role'
+);
+
+-- Self-check of the generic H1 check: a table and its sequence created
+-- without the explicit grants are reported, privilege by privilege, and the
+-- explicit grants clear them. The same holds in schema private.
+select results_eq(
+  $$ select relation, privilege from pg_temp.service_role_privilege_gaps() where relation like '%zz_pp03_after_00001%' $$,
+  $$
+    values
+      ('public.zz_pp03_after_00001'::text, 'DELETE'::text),
+      ('public.zz_pp03_after_00001', 'INSERT'),
+      ('public.zz_pp03_after_00001', 'SELECT'),
+      ('public.zz_pp03_after_00001', 'UPDATE'),
+      ('public.zz_pp03_after_00001_id_seq', 'SELECT'),
+      ('public.zz_pp03_after_00001_id_seq', 'USAGE')
+  $$,
+  'H1 self-check: the generic check reports every missing service_role privilege of a table and its sequence'
+);
+
+create table private.zz_pp03_private_table (id integer primary key);
+select results_eq(
+  $$ select relation, privilege from pg_temp.service_role_privilege_gaps() where relation = 'private.zz_pp03_private_table' $$,
+  $$
+    values
+      ('private.zz_pp03_private_table'::text, 'DELETE'::text),
+      ('private.zz_pp03_private_table', 'INSERT'),
+      ('private.zz_pp03_private_table', 'SELECT'),
+      ('private.zz_pp03_private_table', 'UPDATE')
+  $$,
+  'H1 self-check: the generic check covers tables in schema private'
+);
+
+grant select, insert on table public.zz_pp03_after_00001 to service_role;
+select results_eq(
+  $$ select relation, privilege from pg_temp.service_role_privilege_gaps() where relation = 'public.zz_pp03_after_00001' $$,
+  $$ values ('public.zz_pp03_after_00001'::text, 'DELETE'::text), ('public.zz_pp03_after_00001', 'UPDATE') $$,
+  'H1 self-check: a partial grant still reports the privileges it leaves out'
+);
+
+grant select, insert, update, delete on table public.zz_pp03_after_00001 to service_role;
+grant usage, select on sequence public.zz_pp03_after_00001_id_seq to service_role;
+grant select, insert, update, delete on table private.zz_pp03_private_table to service_role;
+select is_empty(
+  $$ select 1 from pg_temp.service_role_privilege_gaps() where relation like '%zz_pp03_%' $$,
+  'H1 self-check: the explicit grants clear every reported gap'
 );
 
 create function public.zz_pp03_after_00001_fn()
@@ -194,6 +290,11 @@ select ok(
   not has_function_privilege('anon', 'private.zz_pp03_after_00001_private_fn()', 'execute')
     and not has_function_privilege('authenticated', 'private.zz_pp03_after_00001_private_fn()', 'execute'),
   'R1-19: a function created in private after 00001 is not executable by anon or authenticated'
+);
+select ok(
+  not has_function_privilege('service_role', 'public.zz_pp03_after_00001_fn()', 'execute')
+    and not has_function_privilege('service_role', 'private.zz_pp03_after_00001_private_fn()', 'execute'),
+  'H1: a function created after 00001 is not executable by service_role until its migration grants EXECUTE'
 );
 
 -- ---------------------------------------------------------------------------

@@ -27,10 +27,13 @@ max_rows = 1000
 # `postgres` are reachable through the Data API roles (`anon`, `authenticated`, `service_role`)
 # without explicit GRANTs, matching the cloud default. Set to `false` to require explicit GRANTs
 # instead. Left unset, a fresh project falls back to `true`.
-# Prompt Piggy: deliberately left unset (true). That is the worst case, in which Supabase's
-# bootstrap grants ALL to anon and authenticated by default, so the pgTAP privilege tests prove
-# that 00001_foundation.sql revokes them. 00001 also grants service_role explicitly, so the
-# schema behaves the same when a project uses `false`.
+# Prompt Piggy: deliberately left unset (true). 00001_foundation.sql revokes every default
+# privilege in `public` from anon, authenticated, and service_role, so after 00001 the default
+# privileges are identical with true or false, and identical to a hosted project before or after
+# Supabase's 2026-10-30 enforcement. Given that, true is the stricter test: the bootstrap grants
+# ALL (including TRUNCATE, REFERENCES, TRIGGER, and MAINTAIN) to anon, authenticated, and
+# service_role, so the pgTAP suite proves that 00001 removes all of it. A table that a later
+# migration creates without an explicit service_role grant fails the suite in either mode.
 # auto_expose_new_tables = true
 
 [api.tls]

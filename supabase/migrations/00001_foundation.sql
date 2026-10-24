@@ -5,9 +5,9 @@
 --   2. Schema private for internal helpers. PostgREST does not expose it (R2-17).
 --   3. Deny-by-default privileges, before any table or function exists. This is
 --      the lesson of skylite 00035, plus the global function revoke (R1-19).
---      Explicit default grants to service_role keep the blueprint's "the
---      service role is fully trusted" rule true on projects that no longer
---      hand out Data API privileges by default (Supabase changelog, 2026-04-28).
+--      The default privileges of service_role are revoked too, so no object
+--      depends on a platform-managed default ACL: every table, sequence, and
+--      function grants service_role explicitly (PR #3 review, H1).
 --   4. private.handle_updated_at(), public.app_config_value_ok(), and the
 --      profile validators private.profile_display_name_ok() and
 --      private.profile_avatar_url_ok().
@@ -25,6 +25,10 @@
 --   - Every table has RLS enabled, and every grant to anon or authenticated is
 --     explicit. No table grants INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES,
 --     TRIGGER, or MAINTAIN to anon or authenticated.
+--   - Every table grants select, insert, update, delete to service_role
+--     explicitly, and every sequence grants usage, select to service_role.
+--     Never rely on default privileges for any role. The pgTAP suite checks
+--     every table and sequence in public and private for these grants.
 --
 -- Re-runnable: every statement is idempotent (if not exists, create or replace,
 -- drop policy if exists, on conflict do nothing, and REVOKE and GRANT, which are
@@ -54,7 +58,7 @@ comment on schema private is
 -- ===========================================================================
 -- 3. Deny by default (skylite 00035, REVIEW-1 R1-19)
 -- ===========================================================================
--- Supabase's project bootstrap runs, as postgres:
+-- On older projects, Supabase's bootstrap runs, as postgres:
 --   alter default privileges in schema public grant all on tables
 --     to postgres, anon, authenticated, service_role;
 -- and the same for sequences and functions. On PostgreSQL 17, ALL on a table
@@ -65,25 +69,30 @@ comment on schema private is
 -- before any table or function exists, so nothing is created with those
 -- grants. They are written without "for role", which means the current role,
 -- postgres.
-alter default privileges in schema public revoke all on tables    from anon, authenticated;
-alter default privileges in schema public revoke all on sequences from anon, authenticated;
+--
+-- service_role is revoked here too. Supabase's change "Tables not exposed to
+-- Data and GraphQL API automatically" (opt-in 2026-04-28, the default for new
+-- projects from 2026-05-30, enforced on all projects on 2026-10-30) revokes
+-- these defaults from service_role as well, at a time the platform chooses. A
+-- default grant to service_role is therefore not durable: whether a later
+-- table inherited it would depend on when the project was created and when
+-- the enforcement ran. Revoking it here gives every database the same
+-- starting point (no default privilege for any Data API role) on old and new
+-- projects, before and after the enforcement, and locally with either setting
+-- of auto_expose_new_tables. The service role is still fully trusted
+-- (ARCHITECTURE section 5.1); each migration states that trust with explicit
+-- grants, as the tables below do, and the pgTAP suite fails on any table or
+-- sequence that lacks them.
+alter default privileges in schema public revoke all on tables    from anon, authenticated, service_role;
+alter default privileges in schema public revoke all on sequences from anon, authenticated, service_role;
 
 -- Functions: Postgres grants EXECUTE to PUBLIC on every new function through a
 -- built-in default that is not schema-scoped. A per-schema revoke cannot undo
 -- it (R1-19), so the revoke is global. The second statement removes the
--- bootstrap's explicit per-schema grants to anon and authenticated.
+-- bootstrap's explicit per-schema grants, so a function is executable only by
+-- the roles its migration grants.
 alter default privileges for role postgres revoke execute on functions from public;
-alter default privileges in schema public revoke execute on functions from anon, authenticated;
-
--- The service role is fully trusted (ARCHITECTURE section 5.1): every RPC and
--- admin route runs as service_role. Since the Supabase change of 2026-04-28
--- ("Tables not exposed to Data and GraphQL API automatically"), new projects
--- no longer grant table and sequence privileges in public to service_role by
--- default either. These grants restore exactly the DML that service_role is
--- documented to hold, for every table and sequence a later migration creates,
--- on both old and new projects. They grant nothing to anon or authenticated.
-alter default privileges in schema public grant select, insert, update, delete on tables to service_role;
-alter default privileges in schema public grant usage, select on sequences to service_role;
+alter default privileges in schema public revoke execute on functions from anon, authenticated, service_role;
 
 -- ===========================================================================
 -- 4. Shared helper functions
@@ -339,10 +348,26 @@ begin
   where has_table_privilege(r.role_name, t.table_name, p.privilege)
     and not (r.role_name = 'authenticated' and t.table_name = 'public.profiles' and p.privilege = 'SELECT');
 
-  drop table public._pp_00001_privilege_canary;
-
   if v_exposed is not null then
     raise exception '00001: anon or authenticated still hold table privileges: %', v_exposed;
+  end if;
+
+  -- A new table inherits nothing for service_role either, so the explicit
+  -- grants below are what it relies on (PR #3 review, H1).
+  if has_table_privilege('service_role', 'public._pp_00001_privilege_canary', 'SELECT')
+     or has_table_privilege('service_role', 'public._pp_00001_privilege_canary', 'INSERT') then
+    raise exception '00001: a new table still inherits default privileges for service_role';
+  end if;
+  drop table public._pp_00001_privilege_canary;
+
+  select string_agg(format('%s.%s', t.table_name, p.privilege), ', ')
+    into v_exposed
+  from (values ('public.app_config'), ('public.profiles')) as t (table_name)
+  cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) as p (privilege)
+  where not has_table_privilege('service_role', t.table_name, p.privilege);
+
+  if v_exposed is not null then
+    raise exception '00001: service_role lacks its explicit table grants: %', v_exposed;
   end if;
 
   -- A canary function proves the global EXECUTE revoke (R1-19).
