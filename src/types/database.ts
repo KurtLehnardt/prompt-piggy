@@ -227,6 +227,20 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"leases": {
+                  Row: {
+                    "held_until": string,"key": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "held_until": string,"key": string
+                  }
+                  Update: {
+                    "held_until"?: string,"key"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"ledger_entries": {
                   Row: {
                     "amount_cents": number,"attempt_id": string | null,"created_at": string,"external_ref": string | null,"from_account": string,"id": number,"kind": string,"to_account": string,"user_id": string | null
@@ -413,8 +427,50 @@ isOneToOne: true
             [_ in never]: never
           }
           Functions: {
-            "app_config_value_ok":
+            "add_breach_to_golden":
+{ Args: { "p_attempt_id": string }; Returns: string
+                           },
+"admin_grant_funds":
+{ Args: { "p_admin_id": string,"p_amount_cents": number,"p_idempotency_key": string,"p_user_id": string }; Returns: number
+                           },
+"admin_set_player_hidden":
+{ Args: { "p_admin_id": string,"p_hidden": boolean,"p_user_id": string }; Returns: undefined
+                           },
+"app_config_value_ok":
 { Args: { "p_key": string,"p_value": Json }; Returns: boolean
+                           },
+"claim_hardening_job":
+{ Args: { "p_job_id"?: string }; Returns: {
+              "attempt_id": string,
+"claim_count": number,
+"claimed_at": string | null,
+"created_at": string,
+"error_code": string | null,
+"finished_at": string | null,
+"id": string,
+"level_id": number,
+"prompt_sha256": string,
+"rule_set_id": string | null,
+"status": string,
+"trigger": string,
+"user_id": string
+            }[]
+                          SetofOptions: {
+        from: "*"
+        to: "hardening_jobs"
+        isOneToOne: false
+        isSetofReturn: true
+      } },
+"claim_lease":
+{ Args: { "p_key": string,"p_ttl_seconds": number }; Returns: boolean
+                           },
+"donate":
+{ Args: { "p_amount_cents": number,"p_idempotency_key": string,"p_rate_capacity": number,"p_rate_refill_per_min": number,"p_user_id": string }; Returns: {
+              "aura_bps": number,"replay": boolean,"total_donated_cents": number,"wallet_balance_cents": number
+            }[]
+                           },
+"finish_hardening_job":
+{ Args: { "p_error_code": string,"p_job_id": string,"p_rule_set_id": string,"p_status": string }; Returns: undefined
                            },
 "get_level_status":
 { Args: Record<PropertyKey, never>; Returns: {
@@ -431,6 +487,11 @@ isOneToOne: true
               "attempt_price_cents": number,"attempts_enabled": boolean,"repair_price_cents": number
             }[]
                            },
+"get_traffic_corpus":
+{ Args: { "p_exclude_user": string,"p_limit"?: number }; Returns: {
+              "prompt": string,"user_id": string
+            }[]
+                           },
 "insert_rule_proposal":
 { Args: { "p_level_id": number,"p_parent_id": string,"p_rules": Json,"p_source_attempt_id": string,"p_technique": Database["public"]['Enums']["attack_technique"] }; Returns: string
                            },
@@ -445,8 +506,31 @@ isOneToOne: true
 "promote_rule_set":
 { Args: { "p_rule_set_id": string }; Returns: number
                            },
+"prune_live_feed":
+{ Args: { "p_keep_days": number }; Returns: number
+                           },
+"purge_raw_prompts":
+{ Args: { "p_older_than_days": number }; Returns: number
+                           },
+"reap_stale_attempts":
+{ Args: { "p_limit"?: number,"p_older_than_seconds"?: number }; Returns: number
+                           },
 "reject_rule_set":
 { Args: { "p_needs_review": boolean,"p_rejection_code": string,"p_rule_set_id": string }; Returns: undefined
+                           },
+"remove_keyword":
+{ Args: { "p_admin_id": string,"p_keyword": string,"p_level_id": number }; Returns: string
+                           },
+"repair_glass":
+{ Args: { "p_idempotency_key": string,"p_rate_capacity": number,"p_rate_refill_per_min": number,"p_user_id": string }; Returns: {
+              "aura_bps": number,"cracks": number,"replay": boolean,"treasury_cents": number,"wallet_balance_cents": number
+            }[]
+                           },
+"reserve_ai_spend":
+{ Args: { "p_cap_micros": number,"p_day": string,"p_kind": string,"p_micros": number }; Returns: boolean
+                           },
+"reset_game":
+{ Args: { "p_admin_id": string,"p_level"?: number }; Returns: number
                            },
 "reset_level_rules":
 { Args: { "p_level_id": number }; Returns: string
@@ -456,6 +540,9 @@ isOneToOne: true
                            },
 "rule_set_payload_ok":
 { Args: { "p": Json }; Returns: boolean
+                           },
+"settle_ai_spend":
+{ Args: { "p_actual": number,"p_day": string,"p_kind": string,"p_reserved": number }; Returns: undefined
                            }
           }
           Enums: {
