@@ -157,7 +157,7 @@ describe('mapRpcError: every row of the table', () => {
 
   it('a 23505 on attempts (user_id, idempotency_key) is attempt_in_flight with sameKey true', () => {
     const byName = mapRpcError(
-      pgError('23505', 'duplicate key value violates unique constraint "attempts_user_id_idempotency_key_key"')
+      pgError('23505', 'duplicate key value violates unique constraint "attempts_user_idempotency_key"')
     )
     expect(byName.status).toBe(409)
     expect(byName.body).toEqual({
