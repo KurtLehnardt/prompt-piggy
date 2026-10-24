@@ -27,10 +27,13 @@
  * /health page, which shows the variable's name and never its value, may
  * import it.
  *
- * A unit test file (name.test.ts) is judged by the module it tests (name.ts),
- * so a test sits next to its subject under the same rule. Every import form is
- * counted: static, type-only, side-effect, export-from, dynamic import(), and
- * require(), through the @/ alias or a relative path.
+ * Unit test files (name.test.ts, name.spec.tsx, and so on) are exempt from the
+ * allowlist and the denied paths: Vitest runs them in Node, and no bundle ever
+ * includes them, so they cannot expose the key. They may import the client to
+ * test how its errors are handled. The 'use client' rule still applies to
+ * them. Every import form is counted: static, type-only, side-effect,
+ * export-from, dynamic import(), and require(), through the @/ alias or a
+ * relative path.
  *
  * Usage:
  *   node scripts/check-admin-client-imports.mjs               check this repository
@@ -52,7 +55,7 @@ const REPO_ROOT = resolve(dirname(SCRIPT), '..')
 /** Directories scanned for importers. Only these resolve the @/ alias. */
 const SCAN_PREFIXES = ['src/', 'e2e/']
 const CODE_FILE = /\.(?:[cm]?[jt]sx?)$/
-const UNIT_TEST_FILE = /\.(?:test|spec)(\.[cm]?[jt]sx?)$/
+const UNIT_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 
 /** Denied everywhere, whatever the allowlist says. An entry ending in "/" is a prefix. */
 const ALWAYS_DENIED = ['src/app/live/page.tsx', 'src/lib/live/', 'src/components/']
@@ -125,11 +128,6 @@ function isAllowedBy(path, rule) {
   return path.startsWith(rule.prefix) && !(rule.except ?? []).some((prefix) => path.startsWith(prefix))
 }
 
-/** A unit test is judged by the module it tests. */
-function subjectOf(path) {
-  return path.replace(UNIT_TEST_FILE, '$1')
-}
-
 /** Tracked files plus untracked files that are not ignored, so a new file is checked before it is committed. */
 function gitFiles(root) {
   const result = spawnSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'], {
@@ -156,12 +154,13 @@ function check(root) {
     for (const guarded of GUARDED_MODULES) {
       if (!targets.has(guarded.module) || ownModule === guarded.module) continue
       importers++
-      const subject = subjectOf(path)
       if (hasUseClientDirective(source)) {
         failures.push(`${path} imports ${guarded.label} but contains a 'use client' directive.`)
-      } else if (ALWAYS_DENIED.some((entry) => matchesEntry(subject, entry))) {
+      } else if (UNIT_TEST_FILE.test(path)) {
+        continue
+      } else if (ALWAYS_DENIED.some((entry) => matchesEntry(path, entry))) {
         failures.push(`${path} imports ${guarded.label}, which is never allowed under ${ALWAYS_DENIED.join(', ')}.`)
-      } else if (!guarded.allowed.some((rule) => isAllowedBy(subject, rule))) {
+      } else if (!guarded.allowed.some((rule) => isAllowedBy(path, rule))) {
         failures.push(`${path} imports ${guarded.label} but is not on its allowlist in scripts/check-admin-client-imports.mjs.`)
       }
     }
@@ -216,6 +215,11 @@ const SELF_TEST_CASES = [
     files: { 'src/lib/live/snapshot.ts': importAdmin() },
   },
   {
+    name: "a unit test that contains 'use client' is still rejected",
+    expect: 1,
+    files: { 'src/components/wallet/wallet-panel.test.tsx': USE_CLIENT + importAdmin() },
+  },
+  {
     name: 'the secret-key reader imported off its allowlist is rejected',
     expect: 1,
     files: { 'src/lib/ai/openai.ts': importEnvServer() },
@@ -233,6 +237,7 @@ const SELF_TEST_CASES = [
       'src/app/admin/page.tsx': importAdmin(),
       'src/lib/game/attempt-service.ts': importAdmin(),
       'src/lib/game/attempt-service.test.ts': importAdmin(),
+      'src/lib/errors.test.ts': "const load = () => import('@/lib/supabase/admin')\n",
       'src/lib/game/rpc.ts': importAdmin('../supabase/admin'),
       'src/lib/hardening/pipeline/process-job.ts': importAdmin(),
       'src/lib/ai/calibration/run.ts': importAdmin(),

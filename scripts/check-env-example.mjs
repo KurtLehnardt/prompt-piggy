@@ -4,6 +4,10 @@
  * (CHANGES-2 CH2-3, ARCHITECTURE section 13, T30).
  *
  * It fails when:
+ *   - .env.example does not list exactly the names in SECTION_13_NAMES, the
+ *     table in ARCHITECTURE section 13 (revision 2), which includes
+ *     LIVE_VIEW_TOKEN and both the new and the legacy Supabase key names. A
+ *     retired name such as OPENAI_DECISIONS_FALLBACK therefore fails too;
  *   - code under src/ or scripts/ reads an environment variable that
  *     .env.example does not list, except the platform-provided names in
  *     PLATFORM_NAMES and PLATFORM_PREFIXES;
@@ -15,8 +19,9 @@
  *   - git tracks any .env* file other than the root .env.example.
  *
  * A read is process.env.NAME, process.env['NAME'], or a destructuring
- * assignment from process.env. Computed reads such as process.env[name]
- * cannot be resolved statically and are not counted.
+ * assignment from process.env, outside comments. A dotted mention inside a
+ * quoted string, such as a test title, is not a read. Computed reads such as
+ * process.env[name] cannot be resolved statically and are not counted.
  *
  * Usage:
  *   node scripts/check-env-example.mjs               check this repository
@@ -54,6 +59,50 @@ const PLATFORM_NAMES = new Set([
 ])
 const PLATFORM_PREFIXES = ['GITHUB_', 'PLAYWRIGHT_']
 
+/**
+ * ARCHITECTURE section 13 (revision 2), in table order. Changing this list
+ * means changing section 13 and .env.example in the same pull request.
+ */
+const SECTION_13_NAMES = [
+  'NEXT_PUBLIC_APP_URL',
+  'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SECRET_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'OPENAI_API_KEY',
+  'CRON_SECRET',
+  'LIVE_VIEW_TOKEN',
+  'ADMIN_EMAILS',
+  'SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID',
+  'SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET',
+  'OPENAI_CORE_MODEL',
+  'OPENAI_HARDENING_MODEL',
+  'OPENAI_DECISIONS_MODEL',
+  'OPENAI_REASONING_EFFORT',
+  'OPENAI_CORE_MAX_OUTPUT_TOKENS',
+  'OPENAI_HARDENING_MAX_OUTPUT_TOKENS',
+  'OPENAI_DAILY_SPEND_CAP_USD',
+  'OPENAI_ATTEMPT_SPEND_SHARE_PCT',
+  'PIGGY_KILL_SWITCH',
+  'RATE_LIMIT_ATTEMPTS_PER_MIN',
+  'RATE_LIMIT_BURST',
+  'RATE_LIMIT_ATTEMPTS_PER_DAY',
+  'RATE_LIMIT_WALLET_PER_MIN',
+  'MAX_PROMPT_CHARS',
+  'HARDENING_MAX_JOBS_PER_HOUR',
+  'HARDENING_MAX_JOBS_PER_USER_PER_HOUR',
+  'HARDENING_TRAFFIC_WINDOW',
+  'HARDENING_TRAFFIC_MAX_BPS',
+  'RAW_PROMPT_RETENTION_DAYS',
+  'PAYMENTS_MODE',
+  'E2E_TEST_MODE',
+  'ALLOW_E2E_TEST_MODE',
+  'CALIBRATE',
+  'CALIBRATION_PROMPTS_FILE',
+  'LEVEL_SECRETS_FILE',
+]
+
 /** Each pair is [new name, legacy fallback]. Both must be listed, new name first. */
 const KEY_PAIRS = [
   ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'],
@@ -73,12 +122,18 @@ function stripComments(source) {
   return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\])\/\/.*$/gm, '$1')
 }
 
+/** Removes single- and double-quoted string literals that end on the same line. */
+function stripQuotedStrings(code) {
+  return code.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"/g, "''")
+}
+
 /** Every environment variable name the source reads statically. */
 function envReads(source) {
   const code = stripComments(source)
   const names = new Set()
-  for (const match of code.matchAll(DOT_READ)) names.add(match[1])
+  // Bracket reads carry the name in quotes, so they are found before strings are removed.
   for (const match of code.matchAll(BRACKET_READ)) names.add(match[1])
+  for (const match of stripQuotedStrings(code).matchAll(DOT_READ)) names.add(match[1])
   for (const match of code.matchAll(DESTRUCTURE)) {
     for (const part of match[1].split(',')) {
       const key = part.split(/[:=]/)[0].trim().replace(/^\.\.\./, '')
@@ -134,6 +189,14 @@ function check(root) {
     const { names, problems } = parseEnvExample(readFileSync(examplePath, 'utf8'))
     listed = names
     failures.push(...problems)
+    for (const name of SECTION_13_NAMES) {
+      if (!names.includes(name)) failures.push(`.env.example is missing ${name}, which ARCHITECTURE section 13 lists.`)
+    }
+    for (const name of names) {
+      if (!SECTION_13_NAMES.includes(name)) {
+        failures.push(`.env.example lists ${name}, which ARCHITECTURE section 13 does not (a retired or unknown name).`)
+      }
+    }
     for (const [current, legacy] of KEY_PAIRS) {
       for (const name of [current, legacy]) {
         if (!names.includes(name)) failures.push(`.env.example is missing ${name}. Both ${current} and its legacy fallback ${legacy} must be listed.`)
@@ -178,19 +241,12 @@ function check(root) {
 // ---------------------------------------------------------------------------
 
 const ENV = ['process', 'env'].join('.')
-const CLEAN_EXAMPLE = [
-  '# names only',
-  'NEXT_PUBLIC_APP_URL=',
-  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY=',
-  'SUPABASE_SECRET_KEY=',
-  'SUPABASE_SERVICE_ROLE_KEY=',
-  '',
-].join('\n')
+const CLEAN_EXAMPLE = ['# names only', ...SECTION_13_NAMES.map((name) => `${name}=`), ''].join('\n')
 const CLEAN_SOURCE = [
   `export const url = ${ENV}.NEXT_PUBLIC_APP_URL`,
   `export const key = ${ENV}['SUPABASE_SECRET_KEY']`,
   `export const platform = [${ENV}.NODE_ENV, ${ENV}.VERCEL_URL, ${ENV}.GITHUB_SHA, ${ENV}.PLAYWRIGHT_PORT]`,
+  `export const title = 'reads each variable with a literal ${ENV}.NAME expression'`,
   '',
 ].join('\n')
 
@@ -214,6 +270,16 @@ const SELF_TEST_CASES = [
     name: 'a missing legacy key name is rejected',
     expect: 1,
     files: { '.env.example': CLEAN_EXAMPLE.replace('SUPABASE_SERVICE_ROLE_KEY=\n', '') },
+  },
+  {
+    name: 'a retired name in .env.example is rejected',
+    expect: 1,
+    files: { '.env.example': `${CLEAN_EXAMPLE}OPENAI_DECISIONS_FALLBACK=\n` },
+  },
+  {
+    name: 'a section 13 name missing from .env.example is rejected',
+    expect: 1,
+    files: { '.env.example': CLEAN_EXAMPLE.replace('LIVE_VIEW_TOKEN=\n', '') },
   },
   {
     name: 'a missing new key name is rejected',
