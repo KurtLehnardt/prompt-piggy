@@ -1,0 +1,33 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# build and test output
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# env files (only .env.example is tracked)
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel/
+
+# supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# os and editor
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
