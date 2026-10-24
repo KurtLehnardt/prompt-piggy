@@ -1,0 +1,17 @@
+-- Local seed data for Prompt Piggy.
+--
+-- LOCAL DATABASES ONLY. The Supabase CLI applies this file after the
+-- migrations on `pnpm db:reset` ([db.seed] in supabase/config.toml). It is
+-- never applied to a hosted project: nothing in this repository runs it there,
+-- and the hosted projects get their data from migrations and the operator
+-- scripts only.
+--
+-- Everything that every database needs, such as the app_config defaults, is
+-- seeded by a migration, not here. This file holds data that exists only for
+-- local development and tests. The repository is public, so it holds
+-- synthetic placeholders only and never a secret (CH2-3).
+--
+-- The foundation migration (00001, task PP-03) needs no local-only data, so
+-- this file starts with no statements. Task PP-07 appends the level 4 and 5
+-- placeholder secrets from
+-- src/lib/config/__fixtures__/level-secrets.placeholder.json.
