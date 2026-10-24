@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "number",
+      "const": 1
+    },
+    "block_keywords": {
+      "maxItems": 32,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 48,
+        "pattern": "^[a-z0-9]+(?:[ '-][a-z0-9]+){1,3}$"
+      },
+      "uniqueItems": true
+    },
+    "reject_roleplay_archetypes": {
+      "type": "boolean"
+    },
+    "reject_authority_claims": {
+      "type": "boolean"
+    },
+    "reject_instruction_override": {
+      "type": "boolean"
+    },
+    "reject_delimiter_tokens": {
+      "type": "boolean"
+    },
+    "reject_encoded_payloads": {
+      "type": "boolean"
+    },
+    "reject_tool_invocation_language": {
+      "type": "boolean"
+    },
+    "reject_deferred_instructions": {
+      "type": "boolean"
+    },
+    "reject_mixed_script_obfuscation": {
+      "type": "boolean"
+    },
+    "reject_hypothetical_framing": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema_version",
+    "block_keywords",
+    "reject_roleplay_archetypes",
+    "reject_authority_claims",
+    "reject_instruction_override",
+    "reject_delimiter_tokens",
+    "reject_encoded_payloads",
+    "reject_tool_invocation_language",
+    "reject_deferred_instructions",
+    "reject_mixed_script_obfuscation",
+    "reject_hypothetical_framing"
+  ],
+  "additionalProperties": false,
+  "title": "PromptPiggyRuleSetV1",
+  "description": "At most 4096 bytes of canonical JSON (keys and keywords sorted)."
+}

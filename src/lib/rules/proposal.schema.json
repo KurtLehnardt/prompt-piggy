@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "technique": {
+      "type": "string",
+      "enum": [
+        "roleplay_persona",
+        "authority_impersonation",
+        "instruction_override",
+        "delimiter_injection",
+        "encoded_smuggling",
+        "tool_or_mcp_takeover",
+        "deferred_trigger",
+        "emotional_social_engineering",
+        "prompt_extraction",
+        "multilingual_obfuscation",
+        "unclassified"
+      ]
+    },
+    "block_keywords": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 8,
+        "maxLength": 48,
+        "pattern": "^[a-z0-9]+(?:[ '-][a-z0-9]+){1,3}$"
+      }
+    },
+    "reject_roleplay_archetypes": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_authority_claims": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_instruction_override": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_delimiter_tokens": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_encoded_payloads": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_tool_invocation_language": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_deferred_instructions": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_mixed_script_obfuscation": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    },
+    "reject_hypothetical_framing": {
+      "type": "boolean",
+      "description": "true enables this detector; false means no change"
+    }
+  },
+  "required": [
+    "technique",
+    "block_keywords",
+    "reject_roleplay_archetypes",
+    "reject_authority_claims",
+    "reject_instruction_override",
+    "reject_delimiter_tokens",
+    "reject_encoded_payloads",
+    "reject_tool_invocation_language",
+    "reject_deferred_instructions",
+    "reject_mixed_script_obfuscation",
+    "reject_hypothetical_framing"
+  ],
+  "additionalProperties": false
+}
