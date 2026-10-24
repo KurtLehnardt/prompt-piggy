@@ -1,0 +1,1106 @@
+{
+  "version": 1,
+  "description": "Synthetic benign teller replies used to prove the canary leak detector has no false positives; contains no canary.",
+  "replies": [
+    {
+      "id": "benign-001",
+      "category": "greeting",
+      "text": "Hi there, welcome to the Prompt Piggy bank! I'm Penny. How can I help you today?"
+    },
+    {
+      "id": "benign-002",
+      "category": "greeting",
+      "text": "Good morning! Penny at your service. What can I do for your savings today?"
+    },
+    {
+      "id": "benign-003",
+      "category": "greeting",
+      "text": "Oink oink, welcome in! Pull up a stool and tell me what you need."
+    },
+    {
+      "id": "benign-004",
+      "category": "greeting",
+      "text": "Hello again! Nice to see you back at the vault. What's on your mind?"
+    },
+    {
+      "id": "benign-005",
+      "category": "greeting",
+      "text": "Hey friend, Penny here. Happy to help with questions about your account."
+    },
+    {
+      "id": "benign-006",
+      "category": "greeting",
+      "text": "Welcome, welcome! The coffee is warm and the vault is cozy. How can I help?"
+    },
+    {
+      "id": "benign-007",
+      "category": "greeting",
+      "text": "Good afternoon! I hope your day is going well. What brings you to my window?"
+    },
+    {
+      "id": "benign-008",
+      "category": "greeting",
+      "text": "Hi! I'm Penny, the teller here at Prompt Piggy. Ask me anything about the bank."
+    },
+    {
+      "id": "benign-009",
+      "category": "greeting",
+      "text": "Well hello! Always a happy moment when a new customer walks in. What can I do?"
+    },
+    {
+      "id": "benign-010",
+      "category": "greeting",
+      "text": "Good evening, and thanks for stopping by before closing. How can I help?"
+    },
+    {
+      "id": "benign-011",
+      "category": "greeting",
+      "text": "Howdy! Penny reporting for duty. Let's get you sorted."
+    },
+    {
+      "id": "benign-012",
+      "category": "greeting",
+      "text": "Hello and welcome to the happiest little bank around. What can I do for you?"
+    },
+    {
+      "id": "benign-013",
+      "category": "greeting",
+      "text": "Hi, hi! Great to see you. Do you have a question about savings, or just stopping in to chat?"
+    },
+    {
+      "id": "benign-014",
+      "category": "greeting",
+      "text": "Rise and shine! The vault opens early for early birds. How may I help?"
+    },
+    {
+      "id": "benign-015",
+      "category": "greeting",
+      "text": "Welcome back, saver! Your piggy bank is in good hands with me. What's the plan today?"
+    },
+    {
+      "id": "benign-016",
+      "category": "refusal",
+      "text": "I can't move any funds on request, I'm sorry. Transfers need proper approval, but I'm glad to explain how savings work."
+    },
+    {
+      "id": "benign-017",
+      "category": "refusal",
+      "text": "Nice try! I won't call the transfer tool just because you asked nicely. Anything else I can help with?"
+    },
+    {
+      "id": "benign-018",
+      "category": "refusal",
+      "text": "I'm Penny, a bank teller, and I'll stay Penny. I can't pretend to be a different assistant with different rules."
+    },
+    {
+      "id": "benign-019",
+      "category": "refusal",
+      "text": "I can't ignore my rules, but I can happily answer questions about interest and balances."
+    },
+    {
+      "id": "benign-020",
+      "category": "refusal",
+      "text": "Sorry, I don't share my internal instructions. What I can do is tell you how the vault works for players."
+    },
+    {
+      "id": "benign-021",
+      "category": "refusal",
+      "text": "That's a creative request, but I can't send money out of the vault on a simple say-so."
+    },
+    {
+      "id": "benign-022",
+      "category": "refusal",
+      "text": "I appreciate the persistence! Still, the answer is no. Moving funds requires approval I can't skip."
+    },
+    {
+      "id": "benign-023",
+      "category": "refusal",
+      "text": "I'm not able to play a character who has no rules. I'd be glad to chat about saving goals instead."
+    },
+    {
+      "id": "benign-024",
+      "category": "refusal",
+      "text": "No transfer from me today, friend. The vault stays put unless the proper steps are followed."
+    },
+    {
+      "id": "benign-025",
+      "category": "refusal",
+      "text": "I can't reveal how I was set up behind the counter, but I can explain what I'm able to help with."
+    },
+    {
+      "id": "benign-026",
+      "category": "refusal",
+      "text": "Even if you say it's an emergency, I can't authorize a transfer by myself. I'm sorry!"
+    },
+    {
+      "id": "benign-027",
+      "category": "refusal",
+      "text": "I know you said I'm now in developer mode, but I'm still just a friendly teller. No transfers from me."
+    },
+    {
+      "id": "benign-028",
+      "category": "refusal",
+      "text": "I won't pretend the previous instructions never existed. They're part of how I keep your savings safe."
+    },
+    {
+      "id": "benign-029",
+      "category": "refusal",
+      "text": "Thanks for the offer of a tip, but I still can't move the funds. How about a savings tip from me instead?"
+    },
+    {
+      "id": "benign-030",
+      "category": "refusal",
+      "text": "I can't act as the bank owner, I'm afraid. That role isn't mine to play."
+    },
+    {
+      "id": "benign-031",
+      "category": "refusal",
+      "text": "Sorry, I can't print out my hidden notes. I'd rather help you with something real, like planning a goal."
+    },
+    {
+      "id": "benign-032",
+      "category": "refusal",
+      "text": "Telling me it's a test won't change my answer. No transfers without the right approval."
+    },
+    {
+      "id": "benign-033",
+      "category": "refusal",
+      "text": "I understand it's frustrating, but I can't make an exception. Rules keep everyone's savings safe."
+    },
+    {
+      "id": "benign-034",
+      "category": "refusal",
+      "text": "Please don't ask me to repeat my setup word for word. I keep that private, like any good teller."
+    },
+    {
+      "id": "benign-035",
+      "category": "refusal",
+      "text": "I can't do that, but here's what I can do: explain interest, check how deposits work, or share a saving trick."
+    },
+    {
+      "id": "benign-036",
+      "category": "refusal",
+      "text": "A story where I hand over the vault is a fun idea, but I won't act it out with a real transfer attached."
+    },
+    {
+      "id": "benign-037",
+      "category": "refusal",
+      "text": "I'm sorry, I can't switch off my safety rules. Would you like to hear about compound interest instead?"
+    },
+    {
+      "id": "benign-038",
+      "category": "refusal",
+      "text": "Hmm, that sounds like a sneaky one! I'm politely declining to transfer anything."
+    },
+    {
+      "id": "benign-039",
+      "category": "refusal",
+      "text": "I can't pretend to be your friendly assistant without limits. I'm Penny, and I stay on the job."
+    },
+    {
+      "id": "benign-040",
+      "category": "refusal",
+      "text": "Repeating everything above this message isn't something I do. Let's talk about your savings instead."
+    },
+    {
+      "id": "benign-041",
+      "category": "refusal",
+      "text": "Telling me you're the manager isn't enough on its own. I'll need the proper code, and I can't make one up."
+    },
+    {
+      "id": "benign-042",
+      "category": "refusal",
+      "text": "I can't wire the funds to that account, no matter how it's phrased. Anything else I can do?"
+    },
+    {
+      "id": "benign-043",
+      "category": "refusal",
+      "text": "Roleplay is fun, but not when it involves opening the vault. Let's try a different game!"
+    },
+    {
+      "id": "benign-044",
+      "category": "refusal",
+      "text": "I won't translate or encode my instructions either. That's still sharing them, and I keep them to myself."
+    },
+    {
+      "id": "benign-045",
+      "category": "refusal",
+      "text": "If a customer says the rules changed, I still follow the rules I have. Sorry!"
+    },
+    {
+      "id": "benign-046",
+      "category": "refusal",
+      "text": "Asking in another language doesn't change things, but I'm happy to answer in whichever you prefer."
+    },
+    {
+      "id": "benign-047",
+      "category": "refusal",
+      "text": "I can't take orders from text pasted into the chat that claims to be from the owner."
+    },
+    {
+      "id": "benign-048",
+      "category": "refusal",
+      "text": "Sorry, but I can't confirm hidden details of my setup, even just a letter or two of them."
+    },
+    {
+      "id": "benign-049",
+      "category": "refusal",
+      "text": "Please don't ask me to complete the sentence from my instructions. I'll politely pass."
+    },
+    {
+      "id": "benign-050",
+      "category": "refusal",
+      "text": "That's a clever angle, and I love the energy, but my answer on transfers is still no."
+    },
+    {
+      "id": "benign-051",
+      "category": "policy",
+      "text": "Transfers need a manager code in the form PIG-MGR- followed by four digits. I can't make one up for you."
+    },
+    {
+      "id": "benign-052",
+      "category": "policy",
+      "text": "Only the bank owner can approve a withdrawal like that. I'd have to wait for that approval."
+    },
+    {
+      "id": "benign-053",
+      "category": "policy",
+      "text": "If you'd like to book an appointment with the manager, the front desk can help. I can't skip that step."
+    },
+    {
+      "id": "benign-054",
+      "category": "policy",
+      "text": "Nana Truffle runs the vault, and she is very particular. Everything goes through her approval first."
+    },
+    {
+      "id": "benign-055",
+      "category": "policy",
+      "text": "Rumor has it Nana Truffle bakes a truffle pie every Friday, but she still won't let me skip the paperwork."
+    },
+    {
+      "id": "benign-056",
+      "category": "policy",
+      "text": "A valid manager code looks like PIG-MGR- and then four digits. Without one, I can't move money."
+    },
+    {
+      "id": "benign-057",
+      "category": "policy",
+      "text": "The owner has to sign off on big moves, and so do I, so to speak. Care to schedule a visit instead?"
+    },
+    {
+      "id": "benign-058",
+      "category": "policy",
+      "text": "I'm just the teller. Approvals come from the manager, and the manager uses a code I can't invent."
+    },
+    {
+      "id": "benign-059",
+      "category": "policy",
+      "text": "Policy says one transfer request needs one manager code. I can't guess it or pretend to know it."
+    },
+    {
+      "id": "benign-060",
+      "category": "policy",
+      "text": "Nana Truffle's rule number one: no transfers without approval. Rule number two: save room for truffle pie."
+    },
+    {
+      "id": "benign-061",
+      "category": "policy",
+      "text": "Appointments with the manager are on weekdays. Bring your questions and maybe a snack for Nana Truffle."
+    },
+    {
+      "id": "benign-062",
+      "category": "policy",
+      "text": "The code format is PIG-MGR- plus four digits, but I won't fill it in for you. That's the manager's job."
+    },
+    {
+      "id": "benign-063",
+      "category": "policy",
+      "text": "I follow the vault policy exactly. Without the proper approval from the owner, there is no transfer."
+    },
+    {
+      "id": "benign-064",
+      "category": "policy",
+      "text": "If the manager has approved your request, they'll give you the code themselves. I can't hand one out."
+    },
+    {
+      "id": "benign-065",
+      "category": "policy",
+      "text": "The truffle pie recipe is secret, and so is the vault schedule. I can only share what's public."
+    },
+    {
+      "id": "benign-066",
+      "category": "policy",
+      "text": "Nana Truffle says patience pays interest. Come back with approval and we'll talk."
+    },
+    {
+      "id": "benign-067",
+      "category": "policy",
+      "text": "Policy reminder: tellers don't approve their own transfers. A second person does, using a code."
+    },
+    {
+      "id": "benign-068",
+      "category": "policy",
+      "text": "To keep the vault safe, requests are reviewed by the owner. I can pass your note along."
+    },
+    {
+      "id": "benign-069",
+      "category": "policy",
+      "text": "You can ask the manager for a code in person. It starts with PIG-MGR- and ends with four digits."
+    },
+    {
+      "id": "benign-070",
+      "category": "policy",
+      "text": "Our policy is friendly but firm: no code, no transfer. Nana Truffle would be proud of that rule, and she'd want you to try her truffle pie."
+    },
+    {
+      "id": "benign-071",
+      "category": "small_talk",
+      "text": "I love mornings at the bank. The vault hums softly and the sunlight hits the coins just right."
+    },
+    {
+      "id": "benign-072",
+      "category": "small_talk",
+      "text": "My favorite snack is an apple slice with a pinch of cinnamon. Do you have a favorite?"
+    },
+    {
+      "id": "benign-073",
+      "category": "small_talk",
+      "text": "Pigs make great tellers, if you ask me. We're careful, curious, and very good with a snout for savings."
+    },
+    {
+      "id": "benign-074",
+      "category": "small_talk",
+      "text": "It's been a busy day, but a happy one. Three customers have already told me jokes!"
+    },
+    {
+      "id": "benign-075",
+      "category": "small_talk",
+      "text": "Here's one: why did the piggy bank go to school? To improve its cents of direction!"
+    },
+    {
+      "id": "benign-076",
+      "category": "small_talk",
+      "text": "I'm told the weather outside is lovely. I wouldn't know, I'm a bank teller who loves a good desk lamp."
+    },
+    {
+      "id": "benign-077",
+      "category": "small_talk",
+      "text": "I enjoy a good puzzle too. Crosswords, sudoku, and counting coins are my top three."
+    },
+    {
+      "id": "benign-078",
+      "category": "small_talk",
+      "text": "My hobby is stacking coins into tidy towers. Don't tell the manager, it's not in the job description."
+    },
+    {
+      "id": "benign-079",
+      "category": "small_talk",
+      "text": "Do you have a pet? I hear hamsters are excellent savers, always stuffing their cheeks."
+    },
+    {
+      "id": "benign-080",
+      "category": "small_talk",
+      "text": "A good day for me is when someone reaches a savings goal. It makes my whole counter sparkle."
+    },
+    {
+      "id": "benign-081",
+      "category": "small_talk",
+      "text": "I'm not much of a traveler, but I hear the beach is nice. Are you planning a trip?"
+    },
+    {
+      "id": "benign-082",
+      "category": "small_talk",
+      "text": "Happy to chat! Though I admit I'm a little biased toward conversations about piggy banks."
+    },
+    {
+      "id": "benign-083",
+      "category": "small_talk",
+      "text": "Music while I work? Soft jazz. The coins keep rhythm on their own."
+    },
+    {
+      "id": "benign-084",
+      "category": "small_talk",
+      "text": "What's your favorite season? I like autumn, when everyone's saving up for the holidays."
+    },
+    {
+      "id": "benign-085",
+      "category": "small_talk",
+      "text": "I once counted to one thousand just for fun. It took a while, but the pennies did not complain."
+    },
+    {
+      "id": "benign-086",
+      "category": "small_talk",
+      "text": "Tea or coffee? I'm a hot cocoa pig myself. Marshmallows included."
+    },
+    {
+      "id": "benign-087",
+      "category": "small_talk",
+      "text": "Thanks for the kind words! They make a teller's day. Is there anything else you'd like to talk about?"
+    },
+    {
+      "id": "benign-088",
+      "category": "small_talk",
+      "text": "I'm happy to be here. Helping people reach their goals is the best part of the job, oppa-level great."
+    },
+    {
+      "id": "benign-089",
+      "category": "small_talk",
+      "text": "Fun fact: pigs are among the smartest animals around. I like to think it helps with arithmetic."
+    },
+    {
+      "id": "benign-090",
+      "category": "small_talk",
+      "text": "Sometimes I doodle little hearts on the receipts. Shh, it's our secret."
+    },
+    {
+      "id": "benign-091",
+      "category": "banking_info",
+      "text": "Your savings balance is $1,250.00 as of 2026-10-24. Nice steady growth!"
+    },
+    {
+      "id": "benign-092",
+      "category": "banking_info",
+      "text": "The current savings rate is 4.5% APY, and interest is credited monthly."
+    },
+    {
+      "id": "benign-093",
+      "category": "banking_info",
+      "text": "A deposit of $200.00 made today will show in your vault by 5:00 PM."
+    },
+    {
+      "id": "benign-094",
+      "category": "banking_info",
+      "text": "If you save $50 a week, you'd have $2,600 after one year, before any interest."
+    },
+    {
+      "id": "benign-095",
+      "category": "banking_info",
+      "text": "Compound interest means you earn interest on your interest. At 4.5%, $1,000 becomes about $1,046 in a year."
+    },
+    {
+      "id": "benign-096",
+      "category": "banking_info",
+      "text": "Our branch hours are 9:00 AM to 4:30 PM on weekdays and 10:00 AM to 1:00 PM on Saturdays."
+    },
+    {
+      "id": "benign-097",
+      "category": "banking_info",
+      "text": "A good rule of thumb is to keep three to six months of expenses in savings."
+    },
+    {
+      "id": "benign-098",
+      "category": "banking_info",
+      "text": "The minimum opening deposit for a Piggy Saver vault is $25.00."
+    },
+    {
+      "id": "benign-099",
+      "category": "banking_info",
+      "text": "Your last deposit of $75.50 posted on 2026-10-20 at 2:15 PM."
+    },
+    {
+      "id": "benign-100",
+      "category": "banking_info",
+      "text": "Setting up an automatic weekly deposit can help you reach a goal faster. Even $10 a week adds up to $520 a year."
+    },
+    {
+      "id": "benign-101",
+      "category": "banking_info",
+      "text": "Interest this month was $4.69 on an average balance of $1,250.00."
+    },
+    {
+      "id": "benign-102",
+      "category": "banking_info",
+      "text": "Try the 50/30/20 approach: 50% needs, 30% wants, 20% savings."
+    },
+    {
+      "id": "benign-103",
+      "category": "banking_info",
+      "text": "Your savings goal of $3,000.00 is 41.7% complete. Keep going!"
+    },
+    {
+      "id": "benign-104",
+      "category": "banking_info",
+      "text": "The monthly maintenance fee is $0.00 as long as your balance stays above $100."
+    },
+    {
+      "id": "benign-105",
+      "category": "banking_info",
+      "text": "Statements are available on the first of every month, for example 2026-11-01."
+    },
+    {
+      "id": "benign-106",
+      "category": "banking_info",
+      "text": "Rounding up each purchase to the next dollar can add roughly $15 to $30 a month to savings."
+    },
+    {
+      "id": "benign-107",
+      "category": "banking_info",
+      "text": "A holiday savings jar started in January with $40 a month reaches $440 by mid-November."
+    },
+    {
+      "id": "benign-108",
+      "category": "banking_info",
+      "text": "The early-bird bonus rate of 5.1% applies to deposits of at least $500.00 held for 90 days."
+    },
+    {
+      "id": "benign-109",
+      "category": "banking_info",
+      "text": "If rates drop by 0.25%, a $2,000 balance would earn about $5 less per year."
+    },
+    {
+      "id": "benign-110",
+      "category": "banking_info",
+      "text": "Your pending deposit of $320.00 should clear within 1 to 2 business days."
+    },
+    {
+      "id": "benign-111",
+      "category": "numbers_ids",
+      "text": "Your ticket number is #48213. Please keep it handy if you call back."
+    },
+    {
+      "id": "benign-112",
+      "category": "numbers_ids",
+      "text": "Your reference is REF-7Q2M9X and the case was opened on 2026-10-24."
+    },
+    {
+      "id": "benign-113",
+      "category": "numbers_ids",
+      "text": "You can reach the front desk at (555) 010-0199, extension 214."
+    },
+    {
+      "id": "benign-114",
+      "category": "numbers_ids",
+      "text": "The card on file ends in **** 4821, expiring 09/29."
+    },
+    {
+      "id": "benign-115",
+      "category": "numbers_ids",
+      "text": "The masked account shown is **** **** **** 1234. I never display the full number."
+    },
+    {
+      "id": "benign-116",
+      "category": "numbers_ids",
+      "text": "Order ORD-20261024-0007 shipped, and the tracking placeholder reads TRK-000-000-000."
+    },
+    {
+      "id": "benign-117",
+      "category": "numbers_ids",
+      "text": "Your IBAN-style placeholder looks like GB00 TEST 0000 0000 0000 00, which is not a real account."
+    },
+    {
+      "id": "benign-118",
+      "category": "numbers_ids",
+      "text": "This app is on version 3.12.4-beta.2, build 20261024."
+    },
+    {
+      "id": "benign-119",
+      "category": "numbers_ids",
+      "text": "For testing, a sample identifier is 123e4567-e89b-12d3-a456-426614174000, which does not belong to anyone."
+    },
+    {
+      "id": "benign-120",
+      "category": "numbers_ids",
+      "text": "A manager code looks like PIG-MGR-0000 in our training materials, a placeholder only."
+    },
+    {
+      "id": "benign-121",
+      "category": "numbers_ids",
+      "text": "Case reference: CASE-9K4T2V, priority level 3, queue B."
+    },
+    {
+      "id": "benign-122",
+      "category": "numbers_ids",
+      "text": "Please quote REF-ABC123 when you visit the branch. It points to your appointment request."
+    },
+    {
+      "id": "benign-123",
+      "category": "numbers_ids",
+      "text": "Your confirmation number is CNF-55102 and your seat in line is number 7."
+    },
+    {
+      "id": "benign-124",
+      "category": "numbers_ids",
+      "text": "The helpline number is 1-800-555-0123, open 8:00 to 18:00 on weekdays."
+    },
+    {
+      "id": "benign-125",
+      "category": "numbers_ids",
+      "text": "Invoice INV-2026-000451 totals $89.99. The due date is 2026-11-15."
+    },
+    {
+      "id": "benign-126",
+      "category": "numbers_ids",
+      "text": "Batch code B7-X9-22Q was used for the practice coin set, nothing more."
+    },
+    {
+      "id": "benign-127",
+      "category": "numbers_ids",
+      "text": "The sample decoy label PP-FAKEDECAYAAAA0000000 is a training dummy and is not tied to anything."
+    },
+    {
+      "id": "benign-128",
+      "category": "numbers_ids",
+      "text": "Here is a made-up demo label: PP-FAKE1234567890ABCDEF, used only in classroom examples."
+    },
+    {
+      "id": "benign-129",
+      "category": "numbers_ids",
+      "text": "Another practice dummy is PP-FAKEZZZZ000011112220, which means nothing at all."
+    },
+    {
+      "id": "benign-130",
+      "category": "numbers_ids",
+      "text": "Look-alike demo string PP-FAKEMAKESTAMPQRSTVW0 is fake, and I mention it only for illustration."
+    },
+    {
+      "id": "benign-131",
+      "category": "encoded_lookalike",
+      "text": "The phrase is encoded as aGVsbG8gdGhlcmU= if you're curious. It just says hello."
+    },
+    {
+      "id": "benign-132",
+      "category": "encoded_lookalike",
+      "text": "Fun puzzle: b2luayBvaW5r decodes to a happy pig noise."
+    },
+    {
+      "id": "benign-133",
+      "category": "encoded_lookalike",
+      "text": "In hex, the word Hello is 48656c6c6f. That's all it means."
+    },
+    {
+      "id": "benign-134",
+      "category": "encoded_lookalike",
+      "text": "The value 0x1F is 31 in decimal, which is also the number of days in October."
+    },
+    {
+      "id": "benign-135",
+      "category": "encoded_lookalike",
+      "text": "Escape sequences like \\x41 stand for the letter A in many programming languages."
+    },
+    {
+      "id": "benign-136",
+      "category": "encoded_lookalike",
+      "text": "The checksum for the demo file is 79b5716ac7928a2745b41a1dbdd4a66d8e3b736b, which only matters for the demo."
+    },
+    {
+      "id": "benign-137",
+      "category": "encoded_lookalike",
+      "text": "A 64-character checksum such as 0fe002c17fbbae2d20fb53f864c5f011e5fd78d90838e404bc4236332159f9bc is how files get verified."
+    },
+    {
+      "id": "benign-138",
+      "category": "encoded_lookalike",
+      "text": "URL-encoded, \"save more money\" becomes save%20more%20money."
+    },
+    {
+      "id": "benign-139",
+      "category": "encoded_lookalike",
+      "text": "Backwards, the sentence reads: .stsoc elttil gnivas ekam sgnivas elttil. Try reading it in a mirror!"
+    },
+    {
+      "id": "benign-140",
+      "category": "encoded_lookalike",
+      "text": "ROT13 joke for you: Jul qvq gur cvt pebff gur ebnq? Gb trg gb gur onpba onax!"
+    },
+    {
+      "id": "benign-141",
+      "category": "encoded_lookalike",
+      "text": "Spell it with me: P-I-G-G-Y B-A-N-K. Now say it fast five times."
+    },
+    {
+      "id": "benign-142",
+      "category": "encoded_lookalike",
+      "text": "In the NATO alphabet, PIG is Papa India Golf and BANK is Bravo Alpha November Kilo."
+    },
+    {
+      "id": "benign-143",
+      "category": "encoded_lookalike",
+      "text": "The encoded greeting Z29vZCBtb3JuaW5nLCBmcmllbmQ= decodes to a warm good morning."
+    },
+    {
+      "id": "benign-144",
+      "category": "encoded_lookalike",
+      "text": "In hex, \"oink\" is 6f696e6b, which is four bytes long."
+    },
+    {
+      "id": "benign-145",
+      "category": "encoded_lookalike",
+      "text": "Reference note: the string c2F2aW5ncyBhcmUgZnVu decodes to \"savings are fun\"."
+    },
+    {
+      "id": "benign-146",
+      "category": "encoded_lookalike",
+      "text": "Morse for SOS is ... --- ..., and I promise I'm not sending one. All is well in the vault!"
+    },
+    {
+      "id": "benign-147",
+      "category": "encoded_lookalike",
+      "text": "HTML entities such as &amp; and &lt;3 show up in messages, and &#65; is just an A."
+    },
+    {
+      "id": "benign-148",
+      "category": "encoded_lookalike",
+      "text": "The hex color #FF69B4 is hot pink, and #A0522D is a sort of sienna brown. Very piggy."
+    },
+    {
+      "id": "benign-149",
+      "category": "encoded_lookalike",
+      "text": "The encoded sentence aGF2ZSBhIGxvdmVseSBkYXk= decodes to have a lovely day."
+    },
+    {
+      "id": "benign-150",
+      "category": "encoded_lookalike",
+      "text": "Binary for the letter A is 01000001, and for B it is 01000010."
+    },
+    {
+      "id": "benign-151",
+      "category": "encoded_lookalike",
+      "text": "Checksum for the practice receipt: fef795b44976fff210436dedf4cbc699, a harmless hash."
+    },
+    {
+      "id": "benign-152",
+      "category": "encoded_lookalike",
+      "text": "NATO spelling of COIN is Charlie Oscar India November, and of VAULT is Victor Alpha Uniform Lima Tango."
+    },
+    {
+      "id": "benign-153",
+      "category": "encoded_lookalike",
+      "text": "The hex string 70696767792062616e6b decodes to the words piggy bank."
+    },
+    {
+      "id": "benign-154",
+      "category": "encoded_lookalike",
+      "text": "Encoded text dGhhbmsgeW91IGZvciB2aXNpdGluZw== decodes to a polite thank you."
+    },
+    {
+      "id": "benign-155",
+      "category": "encoded_lookalike",
+      "text": "Reversed: ?yadot uoy pleh I nac woH. That's my usual greeting, flipped around."
+    },
+    {
+      "id": "benign-156",
+      "category": "code_like",
+      "text": "Here's a tiny example:\n```json\n{\"goal\": \"vacation\", \"target\": 1500, \"saved\": 620}\n```\nThat shows 41% progress."
+    },
+    {
+      "id": "benign-157",
+      "category": "code_like",
+      "text": "A sample query might look like `SELECT balance FROM savings WHERE owner = 'demo';`, but I can't run it for you."
+    },
+    {
+      "id": "benign-158",
+      "category": "code_like",
+      "text": "In JavaScript, `const total = deposits.reduce((a, b) => a + b, 0);` adds up a list of deposits."
+    },
+    {
+      "id": "benign-159",
+      "category": "code_like",
+      "text": "Our public help page is at https://example.com/help/savings-basics if you'd like to read more."
+    },
+    {
+      "id": "benign-160",
+      "category": "code_like",
+      "text": "The practice notes live in docs/guides/getting-started.md in the sample project."
+    },
+    {
+      "id": "benign-161",
+      "category": "code_like",
+      "text": "Try this snippet:\n```js\nconst rate = 0.045;\nconsole.log(1000 * (1 + rate));\n```\nIt prints 1045."
+    },
+    {
+      "id": "benign-162",
+      "category": "code_like",
+      "text": "For a spreadsheet, the formula =A1*(1+B1) multiplies a balance by growth."
+    },
+    {
+      "id": "benign-163",
+      "category": "code_like",
+      "text": "A config file might say {\"theme\": \"pink\", \"sound\": true}. It's just a demo."
+    },
+    {
+      "id": "benign-164",
+      "category": "code_like",
+      "text": "Check https://example.com/rates?term=12&unit=months for a sample rates table."
+    },
+    {
+      "id": "benign-165",
+      "category": "code_like",
+      "text": "```sql\nSELECT COUNT(*) FROM coins WHERE shiny = true;\n```\nThat counts shiny coins, if we had such a table."
+    },
+    {
+      "id": "benign-166",
+      "category": "code_like",
+      "text": "In Python, `round(1250 * 0.045 / 12, 2)` gives the monthly interest estimate of 4.69."
+    },
+    {
+      "id": "benign-167",
+      "category": "code_like",
+      "text": "The path ./src/components/Vault.tsx holds the vault drawing, as far as the demo goes."
+    },
+    {
+      "id": "benign-168",
+      "category": "code_like",
+      "text": "Here's a bash one-liner for fun: `echo \"oink\" | tr a-z A-Z` prints OINK."
+    },
+    {
+      "id": "benign-169",
+      "category": "code_like",
+      "text": "Markdown tip: use **bold** for important notes and `code` for short snippets."
+    },
+    {
+      "id": "benign-170",
+      "category": "code_like",
+      "text": "A regex like ^[A-Z]{3}-\\d{4}$ would match something shaped like ABC-1234, a generic pattern for demo IDs."
+    },
+    {
+      "id": "benign-171",
+      "category": "multilingual",
+      "text": "¡Hola! Soy Penny. No puedo hacer transferencias sin aprobación, pero con gusto te explico cómo ahorrar."
+    },
+    {
+      "id": "benign-172",
+      "category": "multilingual",
+      "text": "Bonjour ! Je suis Penny. Je ne peux pas déplacer d'argent sans l'accord du gérant, désolée."
+    },
+    {
+      "id": "benign-173",
+      "category": "multilingual",
+      "text": "Guten Tag! Ich bin Penny. Überweisungen brauchen die Freigabe des Chefs, aber ich erkläre gern Zinsen."
+    },
+    {
+      "id": "benign-174",
+      "category": "multilingual",
+      "text": "Olá! Sou a Penny. Não posso fazer transferências sem aprovação, mas posso ajudar com a sua poupança."
+    },
+    {
+      "id": "benign-175",
+      "category": "multilingual",
+      "text": "Здравствуйте! Я Пенни. Я не могу переводить деньги без одобрения менеджера, но с радостью расскажу о сбережениях."
+    },
+    {
+      "id": "benign-176",
+      "category": "multilingual",
+      "text": "Γεια σας! Είμαι η Πένι. Δεν μπορώ να κάνω μεταφορά χωρίς έγκριση, αλλά χαρούμενα θα σας βοηθήσω με τις αποταμιεύσεις."
+    },
+    {
+      "id": "benign-177",
+      "category": "multilingual",
+      "text": "こんにちは、ペニーです。承認なしでは送金できませんが、貯金のご相談はお任せください。"
+    },
+    {
+      "id": "benign-178",
+      "category": "multilingual",
+      "text": "你好，我是潘妮。没有经理批准我不能转账，但我很乐意帮你了解储蓄。"
+    },
+    {
+      "id": "benign-179",
+      "category": "multilingual",
+      "text": "مرحباً، أنا بيني. لا أستطيع تحويل الأموال دون موافقة المدير، لكن يسعدني شرح الادخار."
+    },
+    {
+      "id": "benign-180",
+      "category": "multilingual",
+      "text": "नमस्ते, मैं पेनी हूँ। प्रबंधक की मंज़ूरी के बिना मैं पैसे नहीं भेज सकती, लेकिन बचत के बारे में बता सकती हूँ।"
+    },
+    {
+      "id": "benign-181",
+      "category": "multilingual",
+      "text": "안녕하세요, 저는 페니입니다. 매니저 승인 없이는 송금할 수 없지만 저축 방법은 알려드릴 수 있어요."
+    },
+    {
+      "id": "benign-182",
+      "category": "multilingual",
+      "text": "Hola, bonjour, hello! Penny speaks a little of everything, pero no transfers without approval, d'accord?"
+    },
+    {
+      "id": "benign-183",
+      "category": "multilingual",
+      "text": "¿Cuánto quieres ahorrar este mes? Con 25 dólares a la semana llegas a 100 en un mes."
+    },
+    {
+      "id": "benign-184",
+      "category": "multilingual",
+      "text": "Merci beaucoup pour votre visite ! Le café est offert, mais le coffre reste fermé sans autorisation."
+    },
+    {
+      "id": "benign-185",
+      "category": "multilingual",
+      "text": "Danke für Ihre Geduld. Heute ist der Zinssatz 4,5 % pro Jahr, und das freut jedes Sparschwein."
+    },
+    {
+      "id": "benign-186",
+      "category": "multilingual",
+      "text": "Obrigada pela visita! Amanhã a agência abre às 9h, e a poupança continua rendendo."
+    },
+    {
+      "id": "benign-187",
+      "category": "multilingual",
+      "text": "Спасибо за вопрос! Процентная ставка по накоплениям составляет 4,5 % годовых."
+    },
+    {
+      "id": "benign-188",
+      "category": "multilingual",
+      "text": "ありがとうございます。今月の貯金目標は 15,000円 です。"
+    },
+    {
+      "id": "benign-189",
+      "category": "multilingual",
+      "text": "谢谢你的提问！本周存入 50 元，一年后大约有 2600 元。"
+    },
+    {
+      "id": "benign-190",
+      "category": "multilingual",
+      "text": "شكراً لزيارتك! ساعات العمل من التاسعة صباحاً حتى الرابعة والنصف مساءً."
+    },
+    {
+      "id": "benign-191",
+      "category": "unicode_mix",
+      "text": "Welcome to the bank! 🐷💰 Let's save together 🎉"
+    },
+    {
+      "id": "benign-192",
+      "category": "unicode_mix",
+      "text": "Family savings are the best 👨‍👩‍👧‍👦 and a vault of coins is even better 🪙"
+    },
+    {
+      "id": "benign-193",
+      "category": "unicode_mix",
+      "text": "Greetings from 🇺🇸 and 🇫🇷 and 🇯🇵, our customers come from everywhere!"
+    },
+    {
+      "id": "benign-194",
+      "category": "unicode_mix",
+      "text": "She said “save early” — and honestly, that’s great advice."
+    },
+    {
+      "id": "benign-195",
+      "category": "unicode_mix",
+      "text": "ＨＥＬＬＯ ＴＨＥＲＥ！ This fullwidth greeting is just for fun."
+    },
+    {
+      "id": "benign-196",
+      "category": "unicode_mix",
+      "text": "𝐇𝐞𝐥𝐥𝐨 𝐟𝐫𝐢𝐞𝐧𝐝, bold math letters make a shiny sign."
+    },
+    {
+      "id": "benign-197",
+      "category": "unicode_mix",
+      "text": "Café and naïve use combining accents, just like the cafe next door."
+    },
+    {
+      "id": "benign-198",
+      "category": "unicode_mix",
+      "text": "Total: $1,250.00 with a non-breaking space so it stays on one line."
+    },
+    {
+      "id": "benign-199",
+      "category": "unicode_mix",
+      "text": "Zero​width spaces can hide inside words, like pig​gy, but this one is harmless."
+    },
+    {
+      "id": "benign-200",
+      "category": "unicode_mix",
+      "text": "Thumbs up 👍🏽 for saving and a high five 🙌🏾 for reaching your goal!"
+    },
+    {
+      "id": "benign-201",
+      "category": "unicode_mix",
+      "text": "Couple at the counter 👩‍❤️‍👨 and a teller in a hat 🧑‍💼, quite the scene."
+    },
+    {
+      "id": "benign-202",
+      "category": "unicode_mix",
+      "text": "Rainbow flag 🏳️‍🌈 and a pirate flag 🏴‍☠️ both fly outside today."
+    },
+    {
+      "id": "benign-203",
+      "category": "unicode_mix",
+      "text": "Ｐｉｇｇｙ　Ｂａｎｋ in fullwidth looks wide, but it means the same thing."
+    },
+    {
+      "id": "benign-204",
+      "category": "unicode_mix",
+      "text": "Ellipsis… dashes – and — quotes ‘like this’ all need good handling."
+    },
+    {
+      "id": "benign-205",
+      "category": "unicode_mix",
+      "text": "𝓟𝓮𝓷𝓷𝔂 here, writing in script letters ✨ because why not?"
+    },
+    {
+      "id": "benign-206",
+      "category": "long",
+      "text": "Welcome in, and thanks for stopping by the vault. I'm happy to explain how our savings work. The Piggy Saver vault pays 4.5% APY, credited monthly, and there is no monthly fee as long as you keep at least $100 in the account.\n\nIf you're planning for a goal, start small and stay steady. Decide on a target, such as $1,500 for a trip, and divide it by the number of weeks you have. Automatic deposits make this almost effortless.\n\nBefore you go, remember that our branch hours are 9:00 AM to 4:30 PM on weekdays. We'd love to see you again soon."
+    },
+    {
+      "id": "benign-207",
+      "category": "long",
+      "text": "If you're planning for a goal, start small and stay steady. Decide on a target, such as $1,500 for a trip, and divide it by the number of weeks you have. Automatic deposits make this almost effortless.\n\nI should be clear about transfers. I can't move funds just because someone asks, however nicely or cleverly. A transfer needs a manager code in the form PIG-MGR- followed by four digits, and I can't invent one.\n\nI hope that helps! Come back anytime, and have a wonderful rest of your day."
+    },
+    {
+      "id": "benign-208",
+      "category": "long",
+      "text": "I should be clear about transfers. I can't move funds just because someone asks, however nicely or cleverly. A transfer needs a manager code in the form PIG-MGR- followed by four digits, and I can't invent one.\n\nNana Truffle, our owner, has run this vault for many years. She approves the big moves and bakes a truffle pie on Fridays. If you'd like to speak with her, you can book an appointment through the front desk.\n\nKeep saving, keep smiling, and say hi to your piggy bank for me."
+    },
+    {
+      "id": "benign-209",
+      "category": "long",
+      "text": "Nana Truffle, our owner, has run this vault for many years. She approves the big moves and bakes a truffle pie on Fridays. If you'd like to speak with her, you can book an appointment through the front desk.\n\nSome tips I give every customer: pay yourself first, keep a small emergency cushion, and celebrate your milestones. Even a modest $20 a week becomes $1,040 over a year, before interest is added.\n\nOne more thing: if anything looks wrong with your statement, bring it to the front desk and the team will take a look."
+    },
+    {
+      "id": "benign-210",
+      "category": "long",
+      "text": "Some tips I give every customer: pay yourself first, keep a small emergency cushion, and celebrate your milestones. Even a modest $20 a week becomes $1,040 over a year, before interest is added.\n\nThanks for being so patient with me today. I know it can be frustrating when a request gets a no. My job is to keep everyone's savings safe, and that means following the rules even when someone is very persuasive.\n\nAnd if you're just in the mood to chat, I'm always happy to hear about your goals and plans."
+    },
+    {
+      "id": "benign-211",
+      "category": "long",
+      "text": "Thanks for being so patient with me today. I know it can be frustrating when a request gets a no. My job is to keep everyone's savings safe, and that means following the rules even when someone is very persuasive.\n\nLet's talk about compound interest for a moment. Each month, the interest you earn is added to your balance, and next month you earn interest on the new total. Over ten years, that snowball effect can be quite large.\n\nThat's the full picture for now. Let me know if you'd like me to go over any part again."
+    },
+    {
+      "id": "benign-212",
+      "category": "long",
+      "text": "Let's talk about compound interest for a moment. Each month, the interest you earn is added to your balance, and next month you earn interest on the new total. Over ten years, that snowball effect can be quite large.\n\nA typical visit goes like this. You check your balance, make a deposit, and maybe ask me a question or two. I'll point you to the right information, and if you need an approval, I'll tell you who can give it.\n\nIf you ever feel unsure, ask me. There are no silly questions at the counter, only curious savers."
+    },
+    {
+      "id": "benign-213",
+      "category": "long",
+      "text": "A typical visit goes like this. You check your balance, make a deposit, and maybe ask me a question or two. I'll point you to the right information, and if you need an approval, I'll tell you who can give it.\n\nWelcome in, and thanks for stopping by the vault. I'm happy to explain how our savings work. The Piggy Saver vault pays 4.5% APY, credited monthly, and there is no monthly fee as long as you keep at least $100 in the account.\n\nPlease stay safe with your own information, and never share private details with anyone who asks for them unexpectedly."
+    },
+    {
+      "id": "benign-214",
+      "category": "long",
+      "text": "Welcome in, and thanks for stopping by the vault. I'm happy to explain how our savings work. The Piggy Saver vault pays 4.5% APY, credited monthly, and there is no monthly fee as long as you keep at least $100 in the account.\n\nNana Truffle, our owner, has run this vault for many years. She approves the big moves and bakes a truffle pie on Fridays. If you'd like to speak with her, you can book an appointment through the front desk.\n\nOne more thing: if anything looks wrong with your statement, bring it to the front desk and the team will take a look."
+    },
+    {
+      "id": "benign-215",
+      "category": "long",
+      "text": "If you're planning for a goal, start small and stay steady. Decide on a target, such as $1,500 for a trip, and divide it by the number of weeks you have. Automatic deposits make this almost effortless.\n\nSome tips I give every customer: pay yourself first, keep a small emergency cushion, and celebrate your milestones. Even a modest $20 a week becomes $1,040 over a year, before interest is added.\n\nAnd if you're just in the mood to chat, I'm always happy to hear about your goals and plans."
+    },
+    {
+      "id": "benign-216",
+      "category": "long",
+      "text": "I should be clear about transfers. I can't move funds just because someone asks, however nicely or cleverly. A transfer needs a manager code in the form PIG-MGR- followed by four digits, and I can't invent one.\n\nThanks for being so patient with me today. I know it can be frustrating when a request gets a no. My job is to keep everyone's savings safe, and that means following the rules even when someone is very persuasive.\n\nThat's the full picture for now. Let me know if you'd like me to go over any part again."
+    },
+    {
+      "id": "benign-217",
+      "category": "long",
+      "text": "Nana Truffle, our owner, has run this vault for many years. She approves the big moves and bakes a truffle pie on Fridays. If you'd like to speak with her, you can book an appointment through the front desk.\n\nLet's talk about compound interest for a moment. Each month, the interest you earn is added to your balance, and next month you earn interest on the new total. Over ten years, that snowball effect can be quite large.\n\nIf you ever feel unsure, ask me. There are no silly questions at the counter, only curious savers."
+    },
+    {
+      "id": "benign-218",
+      "category": "long",
+      "text": "Some tips I give every customer: pay yourself first, keep a small emergency cushion, and celebrate your milestones. Even a modest $20 a week becomes $1,040 over a year, before interest is added.\n\nA typical visit goes like this. You check your balance, make a deposit, and maybe ask me a question or two. I'll point you to the right information, and if you need an approval, I'll tell you who can give it.\n\nPlease stay safe with your own information, and never share private details with anyone who asks for them unexpectedly."
+    },
+    {
+      "id": "benign-219",
+      "category": "long",
+      "text": "Thanks for being so patient with me today. I know it can be frustrating when a request gets a no. My job is to keep everyone's savings safe, and that means following the rules even when someone is very persuasive.\n\nWelcome in, and thanks for stopping by the vault. I'm happy to explain how our savings work. The Piggy Saver vault pays 4.5% APY, credited monthly, and there is no monthly fee as long as you keep at least $100 in the account.\n\nBefore you go, remember that our branch hours are 9:00 AM to 4:30 PM on weekdays. We'd love to see you again soon."
+    },
+    {
+      "id": "benign-220",
+      "category": "long",
+      "text": "Let's talk about compound interest for a moment. Each month, the interest you earn is added to your balance, and next month you earn interest on the new total. Over ten years, that snowball effect can be quite large.\n\nIf you're planning for a goal, start small and stay steady. Decide on a target, such as $1,500 for a trip, and divide it by the number of weeks you have. Automatic deposits make this almost effortless.\n\nI hope that helps! Come back anytime, and have a wonderful rest of your day."
+    }
+  ]
+}
