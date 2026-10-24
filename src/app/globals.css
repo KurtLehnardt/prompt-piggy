@@ -5,10 +5,18 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Placeholder theme for the PP-01 skeleton. PP-11 owns this file next and
- * replaces the palette with the Prompt Piggy look. The token names follow
- * shadcn/ui (base-nova, neutral) so the primitives in src/components/ui work
- * unchanged.
+ * Prompt Piggy "vault" theme (docs/ARCHITECTURE.md section 1.2 row 18;
+ * REVIEW-1 R1-23). Tailwind v4 reads every token from @theme inline below;
+ * there is no tailwind.config file.
+ *
+ * - The shadcn/ui token names (base-nova) stay, so the primitives in
+ *   src/components/ui work unchanged.
+ * - The vault tokens add the game palette: vault (steel blue, the safe),
+ *   piggy (pink, the pig), coin (gold, money and payouts), glass and crack
+ *   (the pig's glass and its cracks), and aura (the donation glow). Each has a
+ *   matching -foreground color for text on it.
+ * - This file defines no keyframes and no component styles. Component motion
+ *   and layout live in CSS modules next to each component (later UI tasks).
  */
 @theme inline {
   --color-background: var(--background);
@@ -31,6 +39,21 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Vault palette */
+  --color-vault: var(--vault);
+  --color-vault-foreground: var(--vault-foreground);
+  --color-piggy: var(--piggy);
+  --color-piggy-foreground: var(--piggy-foreground);
+  --color-coin: var(--coin);
+  --color-coin-foreground: var(--coin-foreground);
+  --color-glass: var(--glass);
+  --color-glass-foreground: var(--glass-foreground);
+  --color-crack: var(--crack);
+  --color-aura: var(--aura);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -41,46 +64,72 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.985 0.004 250);
+  --foreground: oklch(0.2 0.03 260);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.2 0.03 260);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.2 0.03 260);
+  --primary: oklch(0.32 0.06 260);
+  --primary-foreground: oklch(0.985 0.004 250);
+  --secondary: oklch(0.95 0.01 250);
+  --secondary-foreground: oklch(0.28 0.05 260);
+  --muted: oklch(0.955 0.008 250);
+  --muted-foreground: oklch(0.5 0.03 260);
+  --accent: oklch(0.94 0.04 355);
+  --accent-foreground: oklch(0.32 0.08 355);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  --border: oklch(0.9 0.012 250);
+  --input: oklch(0.9 0.012 250);
+  --ring: oklch(0.7 0.12 355);
+  --radius: 0.75rem;
+
+  --vault: oklch(0.32 0.06 260);
+  --vault-foreground: oklch(0.97 0.01 250);
+  --piggy: oklch(0.72 0.16 355);
+  --piggy-foreground: oklch(0.22 0.06 355);
+  --coin: oklch(0.8 0.15 85);
+  --coin-foreground: oklch(0.3 0.07 70);
+  --glass: oklch(0.93 0.03 220);
+  --glass-foreground: oklch(0.3 0.04 240);
+  --crack: oklch(0.45 0.03 250);
+  --aura: oklch(0.75 0.15 300);
+  --success: oklch(0.62 0.15 150);
+  --success-foreground: oklch(0.98 0.02 150);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.17 0.03 260);
+  --foreground: oklch(0.97 0.01 250);
+  --card: oklch(0.22 0.035 260);
+  --card-foreground: oklch(0.97 0.01 250);
+  --popover: oklch(0.22 0.035 260);
+  --popover-foreground: oklch(0.97 0.01 250);
+  --primary: oklch(0.78 0.13 355);
+  --primary-foreground: oklch(0.2 0.05 355);
+  --secondary: oklch(0.28 0.04 260);
+  --secondary-foreground: oklch(0.97 0.01 250);
+  --muted: oklch(0.27 0.035 260);
+  --muted-foreground: oklch(0.72 0.03 250);
+  --accent: oklch(0.3 0.06 355);
+  --accent-foreground: oklch(0.95 0.03 355);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.12 355);
+
+  --vault: oklch(0.26 0.05 260);
+  --vault-foreground: oklch(0.97 0.01 250);
+  --piggy: oklch(0.78 0.13 355);
+  --piggy-foreground: oklch(0.2 0.05 355);
+  --coin: oklch(0.83 0.14 85);
+  --coin-foreground: oklch(0.25 0.06 70);
+  --glass: oklch(0.35 0.04 230);
+  --glass-foreground: oklch(0.95 0.02 220);
+  --crack: oklch(0.8 0.02 250);
+  --aura: oklch(0.78 0.14 300);
+  --success: oklch(0.7 0.15 150);
+  --success-foreground: oklch(0.18 0.04 150);
 }
 
 @layer base {
