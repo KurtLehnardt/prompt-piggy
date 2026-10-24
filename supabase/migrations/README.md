@@ -11,8 +11,10 @@ Each migration task appends its rows. Only one migration task runs in any parall
 | File | Task | What it does |
 | --- | --- | --- |
 | `00001_foundation.sql` | PP-03 | `pgcrypto` in `extensions`; schema `private` (USAGE for `service_role` only); deny-by-default privileges for `anon`, `authenticated`, and `service_role`, including the global function revoke; `private.handle_updated_at()`; `public.app_config_value_ok(text, jsonb)`; the profile validators `private.profile_display_name_ok(text)` and `private.profile_avatar_url_ok(text)`; `public.app_config` with its nine seed values; `public.profiles` (identity only, owner-readable); a self-check that fails the migration if any revoke did not take effect |
+| `00002_rule_sets.sql` | PP-07 | `public.levels` (readable by `anon` and `authenticated`) and its five rows; the enums `rule_set_state`, `review_status`, and `attack_technique` (12 values, including `unknown`); `public.rule_set_payload_ok(jsonb)`, the SQL mirror of the zod `RuleSetSchema` with every cap; `private.rule_set_sha256(jsonb)`, the hash of a rule set's canonical JSON; `public.rule_sets` (one lineage per level, one active row per level, the stored hash checked against the rules); `public.rule_gate_runs`; `public.golden_prompts`; `public.level_secret_payload_ok(jsonb)` and the service-role-only `public.level_secrets` (no rows: see below); the five active version-0 seed rule sets; a privilege self-check |
+| `00003_rule_set_rpcs.sql` | PP-07 | `insert_rule_proposal` (a paid win only, CH-6b; refuses the technique `unknown`), `promote_rule_set` (gated and monotonic), `reject_rule_set`, `rollback_rule_set`, `reset_level_rules`, and the helper `private._reactivate_rules`; all SECURITY INVOKER and executable by `service_role` only |
 
-Reserved numbers (ARCHITECTURE section 5.6): `00002` and `00003` for PP-07, `00004` for PP-12, `00005` and `00006` for PP-18, and `00007` for PP-22.
+Reserved numbers (ARCHITECTURE section 5.6): `00004` for PP-12, `00005` and `00006` for PP-18, and `00007` for PP-22.
 
 ## Rules for every migration
 
@@ -26,7 +28,7 @@ Reserved numbers (ARCHITECTURE section 5.6): `00002` and `00003` for PP-07, `000
 - **Functions.** Postgres grants EXECUTE to `PUBLIC` on every new function through a built-in default that is not schema-scoped, so a per-schema revoke cannot undo it (REVIEW-1 R1-19). `00001` runs `alter default privileges for role postgres revoke execute on functions from public` and also removes the bootstrap's per-schema grants to `anon` and `authenticated`.
 - **The service role.** Supabase's change "Tables not exposed to Data and GraphQL API automatically" (opt-in 2026-04-28, the default for new projects from 2026-05-30, enforced on all projects on 2026-10-30) revokes the default table and sequence privileges in `public` from `service_role` too, at a time the platform chooses. Whether a table inherited `service_role` DML would therefore depend on when the project was created and when the enforcement ran. `00001` removes that uncertainty: it revokes every default table, sequence, and function privilege in `public` from `service_role` as well, so every database starts the same way, on old and new projects, before and after the enforcement, and locally with either setting of `auto_expose_new_tables`. The service role is still fully trusted (ARCHITECTURE section 5.1); each migration states that trust with explicit grants (the hard rule above).
 - **Every table** enables RLS, runs `revoke all on table ... from public, anon, authenticated`, and then grants exactly what section 5.3 lists, plus the explicit `service_role` grant (`grant select, insert, update, delete on table ... to service_role`, and `grant usage, select on sequence ... to service_role` for each of its sequences). No table grants INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, or MAINTAIN to `anon` or `authenticated`.
-- **Service-role-only tables** (no row is readable by end users) get RLS plus one restrictive deny-all policy for `anon` and `authenticated`, as `app_config` does. That states the intent in the schema, and it keeps `supabase db advisors` free of the "RLS enabled, no policy" finding.
+- **Service-role-only tables** (no row is readable by end users) take one of two forms. `app_config` has RLS plus one restrictive deny-all policy for `anon` and `authenticated`. The tables that ARCHITECTURE section 5.3 lists with no policy (`rule_sets`, `rule_gate_runs`, `golden_prompts`, `level_secrets`, `blocked_fingerprints`, `ai_spend`, `rate_limits`, `hardening_jobs`, `admin_actions`, and `leases`) have RLS enabled, no policy, and no grant to `anon` or `authenticated`. The CI advisor gate allowlists the `rls_enabled_no_policy` finding for exactly those ten tables, with that reason; any other table without a policy fails the job. `level_secrets` must keep no policy at all (REVIEW-2 R2-12, and its pgTAP test).
 - **Every function** gets `revoke all on function ... from public, anon, authenticated`, followed by `grant execute` to the role that calls it, which for an RPC is `service_role`. A function that a CHECK constraint uses must be executable by every role that writes the table, because the CHECK runs with the writer's privileges.
 
 These rules apply to objects created by `postgres`, which is the role every migration runs as, locally and on the hosted projects.
@@ -45,6 +47,22 @@ Use `create table if not exists`, `create index if not exists`, `create or repla
 ### Indexes
 
 Every foreign-key column is indexed, except references to the five-row `levels` table (skill reference `schema-foreign-key-indexes`, REVIEW-2 R2-19).
+
+## Rule sets and level secrets (00002, 00003)
+
+- **Typed rules only (HC1, HC-A1).** A rule set is nine boolean detector flags plus `block_keywords`, a capped array of lowercase ASCII phrases that the validator matches as data. The CHECK `rule_set_payload_ok` rejects any other key, type, or size, so no free-text rule can be stored. The zod schema in `src/lib/rules` stays authoritative in TypeScript.
+- **Hashes.** `rules_sha256` is the sha256 of the rule set's canonical JSON: keys and keywords in ascending code-point order, no whitespace. That is byte-identical to `JSON.stringify` of the same object with sorted keys and keywords, and a CHECK keeps the stored hash equal to the hash of the stored rules. `level_secrets.payload_sha256` is the sha256 of the payload's canonical JSON (keys sorted recursively), computed by `scripts/ops/seed-level-secrets.mjs`.
+- **States and locks.** Only the 00003 functions change which row is active. Each one locks the `levels` row first, then `rule_sets` rows in ascending id order (ARCHITECTURE section 5.1, lock orders 6 and 7). Errors use PTnnn SQLSTATEs whose message starts with the error token, for example `stale_parent` (PT409) or `invalid_rollback_target` (PT422); the header of `00003_rule_set_rpcs.sql` lists them all. Rollback and reset are run by hand from the SQL runbook and skip the gate by design.
+- **Paid wins only (CH-6b).** `insert_rule_proposal` refers to `public.attempts` (created by `00004`) inside plpgsql, so the reference is bound when the statement first runs. Until `00004` exists every call fails closed with `not_a_win`.
+- **Level secrets (R2-12).** No migration writes `level_secrets`; a pgTAP test and a unit test scan every migration for it. Local databases get the placeholders of `src/lib/config/__fixtures__/level-secrets.placeholder.json` from `supabase/seed.sql`. Hosted projects get the real material only through the operator script:
+
+  ```sh
+  # Operator only. LEVEL_SECRETS_FILE defaults to .secrets/level-secrets.json (gitignored).
+  NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SECRET_KEY=... node scripts/ops/seed-level-secrets.mjs --dry-run
+  NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SECRET_KEY=... node scripts/ops/seed-level-secrets.mjs
+  ```
+
+  It refuses a file that git tracks (the committed placeholders load only through `--placeholder-fixture`), refuses placeholders for any URL other than localhost or 127.0.0.1, and prints only level ids and hash prefixes.
 
 ## Local workflow
 
