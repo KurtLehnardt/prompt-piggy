@@ -13,7 +13,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(151);
+select plan(159);
 
 -- ---------------------------------------------------------------------------
 -- Helpers and fixtures
@@ -122,7 +122,10 @@ insert into t_ids (name, id) values
   ('W', '00000000-0000-4000-8000-000000001204'),   -- deleted while holding a breach fingerprint
   ('M1', '00000000-0000-4000-8000-000000001211'),  -- aura and crack fixtures (balances set directly)
   ('M2', '00000000-0000-4000-8000-000000001212'),
-  ('M3', '00000000-0000-4000-8000-000000001213');
+  ('M3', '00000000-0000-4000-8000-000000001213'),
+  ('P', '00000000-0000-4000-8000-000000001221'),   -- created before 00004: backfilled
+  ('P2', '00000000-0000-4000-8000-000000001222'),  -- created before 00004 with a bad Google profile
+  ('P3', '00000000-0000-4000-8000-000000001223');  -- created before 00004, anonymous
 
 create function pg_temp.uid(p_name text)
 returns uuid
@@ -558,6 +561,8 @@ create temporary table t_functions on commit drop as
     'private._sanitize_display_name(text)',
     'private._sanitize_avatar_url(text)',
     'private.handle_new_user()',
+    'private._provision_user(uuid, jsonb, jsonb, boolean)',
+    'private._backfill_users()',
     'private.ledger_append_only()',
     'private.rule_set_activated_feed()',
     'public.get_level_status()',
@@ -570,7 +575,7 @@ select hasnt_function('public', 'handle_new_user', 'R2-17: handle_new_user does 
 select hasnt_function('public', '_sanitize_display_name', 'R2-17: the sanitizers do not exist in schema public');
 select is(
   (select count(*)::integer from t_functions f join pg_proc p on p.oid = f.fn where p.proconfig @> array['search_path=""']),
-  10, 'R2-17: every 00004 function sets search_path to the empty string'
+  12, 'R2-17: every 00004 function sets search_path to the empty string'
 );
 select results_eq(
   $$ select f.fn::text collate "default" from t_functions f join pg_proc p on p.oid = f.fn where p.prosecdef order by 1 $$,
@@ -626,7 +631,7 @@ select is_empty(
 );
 select is_empty(
   $$ select fn from t_bodies
-     where body ~* '(^|[^.[:alnum:]_])(_post_ledger|_sanitize_display_name|_sanitize_avatar_url|profile_display_name_ok|profile_avatar_url_ok|get_live_players)\s*\('
+     where body ~* '(^|[^.[:alnum:]_])(_post_ledger|_sanitize_display_name|_sanitize_avatar_url|_provision_user|profile_display_name_ok|profile_avatar_url_ok|get_live_players)\s*\('
         or body ~* '::\s*(attempt_outcome|crack_event|rule_set_state|attack_technique)\M' $$,
   'R2-17: every call to a project function and every project type in a 00004 function is schema-qualified'
 );
@@ -1058,6 +1063,72 @@ select ok(
   exists (select 1 from public.ledger_entries where external_ref = 'start:' || pg_temp.uid('W')::text)
   and not exists (select 1 from public.wallets where user_id = pg_temp.uid('W')),
   'the journal outlives a deleted user''s wallet'
+);
+
+-- ---------------------------------------------------------------------------
+-- Backfill of accounts created before 00004 (CH-1, R2-06, R2-16): 8 tests
+-- ---------------------------------------------------------------------------
+-- In replica mode ordinary triggers do not fire, so these rows look like
+-- Google sign-ups that happened before the sign-up trigger existed.
+set local session_replication_role = replica;
+insert into auth.users (id, aud, role, email, raw_app_meta_data, raw_user_meta_data, is_anonymous)
+values
+  (pg_temp.uid('P'), 'authenticated', 'authenticated', 'pp12-p@example.test',
+   '{"provider": "google", "providers": ["google"]}',
+   '{"name": "Pre Existing", "picture": "https://lh3.googleusercontent.com/a/ACg8ocJ_pp12-pre=s96-c"}', false),
+  (pg_temp.uid('P2'), 'authenticated', 'authenticated', 'pp12-p2@example.test',
+   '{"provider": "google"}',
+   jsonb_build_object('full_name', E'\u202E\u0007\u200B', 'avatar_url', 'https://evil.example.com/a/x.png'), false),
+  (pg_temp.uid('P3'), 'authenticated', 'authenticated', null, '{"provider": "anonymous"}', '{}', true);
+set local session_replication_role = default;
+
+select ok(
+  not exists (select 1 from public.profiles where id in (pg_temp.uid('P'), pg_temp.uid('P2'), pg_temp.uid('P3')))
+  and not exists (select 1 from public.wallets where user_id in (pg_temp.uid('P'), pg_temp.uid('P2'), pg_temp.uid('P3'))),
+  'the pre-existing users start with no profile and no wallet'
+);
+select is(private._backfill_users(), 2, 'the backfill provisions exactly the two pre-existing non-anonymous users');
+select results_eq(
+  $$ select (select count(*)::integer from public.profiles where id = pg_temp.uid('P')),
+            (select count(*)::integer from public.wallets where user_id = pg_temp.uid('P')),
+            (select balance_cents from public.wallets where user_id = pg_temp.uid('P')),
+            (select count(*)::integer from public.ledger_entries
+              where user_id = pg_temp.uid('P') and kind = 'mint_starting'
+                and external_ref = 'start:' || pg_temp.uid('P')::text and amount_cents = 2000) $$,
+  $$ values (1, 1, 2000::bigint, 1) $$,
+  'CH-1: a pre-existing Google user gets exactly one profile, one wallet, and one 2000-cent start:<id> grant'
+);
+select results_eq(
+  $$ select display_name, avatar_url from public.profiles where id = pg_temp.uid('P') $$,
+  $$ values ('Pre Existing'::text, 'https://lh3.googleusercontent.com/a/ACg8ocJ_pp12-pre=s96-c'::text) $$,
+  'R2-06: the backfill takes the same sanitized Google snapshot as the sign-up trigger'
+);
+select ok(
+  (select p.display_name ~ '^Player [0-9]{4}$' and p.avatar_url is null and w.balance_cents = 2000
+   from public.profiles as p join public.wallets as w on w.user_id = p.id
+   where p.id = pg_temp.uid('P2')),
+  'a bad Google profile falls back to Player and four digits and a null avatar, and is still funded'
+);
+select ok(
+  not exists (select 1 from public.profiles where id = pg_temp.uid('P3'))
+  and not exists (select 1 from public.wallets where user_id = pg_temp.uid('P3'))
+  and not exists (select 1 from public.ledger_entries where user_id = pg_temp.uid('P3')),
+  'R2-16: the backfill leaves a pre-existing anonymous user unprovisioned'
+);
+
+create temporary table t_backfill_before on commit drop as
+  select (select count(*) from public.profiles) as profiles,
+         (select count(*) from public.wallets) as wallets,
+         (select count(*) from public.ledger_entries) as ledger_rows,
+         (select sum(balance_cents) from public.wallets) as balances,
+         (select string_agg(id::text || ':' || display_name || ':' || coalesce(avatar_url, ''), ',' order by id) from public.profiles) as identities;
+select is(private._backfill_users(), 0, 'a re-run of the backfill finds nothing to provision');
+select results_eq(
+  $$ select (select count(*) from public.profiles), (select count(*) from public.wallets),
+            (select count(*) from public.ledger_entries), (select sum(balance_cents) from public.wallets),
+            (select string_agg(id::text || ':' || display_name || ':' || coalesce(avatar_url, ''), ',' order by id) from public.profiles) $$,
+  $$ select profiles, wallets, ledger_rows, balances, identities from t_backfill_before $$,
+  'CH-1: re-running the backfill changes no profile, wallet, balance, or ledger row'
 );
 
 -- ---------------------------------------------------------------------------
