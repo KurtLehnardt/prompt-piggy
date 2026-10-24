@@ -589,7 +589,7 @@ describe('missing or partial Supabase environment (fail closed)', () => {
       expect(response.status).toBe(503)
       expect(await response.json()).toEqual({
         error: 'The service is not configured yet.',
-        code: 'internal',
+        code: 'unavailable',
       })
     })
   })
