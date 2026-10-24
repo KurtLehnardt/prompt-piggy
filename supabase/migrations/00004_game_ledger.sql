@@ -12,7 +12,8 @@
 --   4. private._post_ledger: the only function that changes balance_cents or
 --      treasury_cents (CH-1).
 --   5. The sign-up path: private._sanitize_display_name,
---      private._sanitize_avatar_url, and the trigger private.handle_new_user,
+--      private._sanitize_avatar_url, private._provision_user,
+--      private._backfill_users, and the trigger private.handle_new_user,
 --      which takes the one-time Google snapshot (R2-06), skips anonymous
 --      users (R2-16), and grants the starting balance once (CH-1).
 --   6. Triggers: the append-only ledger and the rule-set activation feed.
@@ -20,8 +21,11 @@
 --      authenticated), and the wall functions get_live_players and
 --      presence_ping (service_role only, R2-07, R2-S1, R3-02).
 --   8. The game_state seed.
---   9. The realtime publication of exactly game_state and live_feed (5.5).
---  10. A self-check that fails the migration if a privilege is not as intended.
+--   9. The backfill: every non-anonymous auth user created before this
+--      migration gets the profile, wallet, and grant the trigger would have
+--      given it (private._backfill_users, idempotent).
+--  10. The realtime publication of exactly game_state and live_feed (5.5).
+--  11. A self-check that fails the migration if a privilege is not as intended.
 --
 -- Access model (section 5.3). There are no INSERT, UPDATE, or DELETE policies
 -- and no write privilege for anon or authenticated anywhere. anon may SELECT
@@ -808,7 +812,9 @@ revoke all on function private._sanitize_avatar_url(text) from public, anon, aut
 grant execute on function private._sanitize_display_name(text) to service_role;
 grant execute on function private._sanitize_avatar_url(text) to service_role;
 
--- The sign-up trigger (AFTER INSERT on auth.users, SECURITY DEFINER).
+-- Provisions one auth user: the profile, the wallet, and the starting grant.
+-- It is the body of the sign-up trigger and of the backfill below, so both
+-- run exactly the same logic.
 --   - An anonymous user gets nothing: no profile, wallet, or grant (R2-16).
 --   - The name and avatar are a one-time snapshot (R2-06). Only when
 --     raw_app_meta_data->>'provider' is google do they come from
@@ -818,53 +824,57 @@ grant execute on function private._sanitize_avatar_url(text) to service_role;
 --     Google's ID token and the user holds no session, so the user cannot
 --     have edited it, and raw_app_meta_data is writable only by the service
 --     role. No trigger copies raw_user_meta_data later.
+--   - An existing profile or wallet is kept (on conflict do nothing).
 --   - The wallet receives starting_balance_cents from app_config once, as a
 --     mint_starting ledger row with external_ref start:<id> (CH-1). An
 --     existing start:<id> row means the grant already happened, so it is
 --     never minted twice.
--- SECURITY DEFINER because GoTrue inserts as supabase_auth_admin, which holds
--- no privilege on these tables. The function lives in schema private with
--- search_path = '' and is executable by no API role.
-create or replace function private.handle_new_user()
-returns trigger
+-- A bad profile never raises: the sanitizers end with the CHECK validators,
+-- and a CHECK that still refuses the row falls back to the default identity.
+-- SECURITY INVOKER; its callers are the SECURITY DEFINER trigger and this
+-- migration, both running as postgres. Executable by no API role.
+create or replace function private._provision_user(
+  p_user_id            uuid,
+  p_raw_app_meta_data  jsonb,
+  p_raw_user_meta_data jsonb,
+  p_is_anonymous       boolean
+)
+returns void
 language plpgsql
-security definer
 set search_path = ''
 as $$
 declare
   v_name     text;
   v_avatar   text;
   v_starting bigint;
-  v_ref      text := 'start:' || new.id::text;
+  v_ref      text := 'start:' || p_user_id::text;
 begin
-  if coalesce(new.is_anonymous, false) then
-    return null;
+  if p_user_id is null or coalesce(p_is_anonymous, false) then
+    return;
   end if;
 
-  if new.raw_app_meta_data ->> 'provider' = 'google' then
+  if p_raw_app_meta_data ->> 'provider' = 'google' then
     v_name := private._sanitize_display_name(
-      coalesce(nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''), new.raw_user_meta_data ->> 'name'));
+      coalesce(nullif(btrim(p_raw_user_meta_data ->> 'full_name'), ''), p_raw_user_meta_data ->> 'name'));
     v_avatar := private._sanitize_avatar_url(
-      coalesce(nullif(btrim(new.raw_user_meta_data ->> 'avatar_url'), ''), new.raw_user_meta_data ->> 'picture'));
+      coalesce(nullif(btrim(p_raw_user_meta_data ->> 'avatar_url'), ''), p_raw_user_meta_data ->> 'picture'));
   else
     v_name := private._sanitize_display_name(null);
     v_avatar := null;
   end if;
 
-  -- The sanitizers already end with the CHECK validators. If a CHECK still
-  -- refuses the row, sign-up continues with the fallback identity.
   begin
     insert into public.profiles (id, display_name, avatar_url)
-    values (new.id, v_name, v_avatar)
+    values (p_user_id, v_name, v_avatar)
     on conflict (id) do nothing;
   exception when check_violation then
     insert into public.profiles (id, display_name, avatar_url)
-    values (new.id, private._sanitize_display_name(null), null)
+    values (p_user_id, private._sanitize_display_name(null), null)
     on conflict (id) do nothing;
   end;
 
   insert into public.wallets (user_id)
-  values (new.id)
+  values (p_user_id)
   on conflict (user_id) do nothing;
 
   select c.value::text::bigint into v_starting
@@ -873,12 +883,61 @@ begin
 
   if coalesce(v_starting, 0) > 0
      and not exists (select 1 from public.ledger_entries as l where l.external_ref = v_ref) then
-    perform private._post_ledger('mint_starting', 'mint', 'player:' || new.id::text, v_starting, new.id, null, v_ref);
+    perform private._post_ledger('mint_starting', 'mint', 'player:' || p_user_id::text, v_starting, p_user_id, null, v_ref);
   end if;
+end
+$$;
 
+revoke all on function private._provision_user(uuid, jsonb, jsonb, boolean) from public, anon, authenticated;
+
+-- The sign-up trigger (AFTER INSERT on auth.users). SECURITY DEFINER because
+-- GoTrue inserts as supabase_auth_admin, which holds no privilege on these
+-- tables. The function lives in schema private with search_path = '' and is
+-- executable by no API role.
+create or replace function private.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  perform private._provision_user(new.id, new.raw_app_meta_data, new.raw_user_meta_data, new.is_anonymous);
   return null;
 end
 $$;
+
+-- Backfill: provisions every non-anonymous auth user that lacks a profile, a
+-- wallet, or the start:<id> grant, for example a Google account that signed
+-- in before this migration existed. It runs private._provision_user, so a
+-- re-run never creates a second profile or wallet and never grants twice.
+-- Returns the number of users it provisioned. Anonymous users stay
+-- unprovisioned (R2-16). Executable by no API role; section 9 runs it.
+create or replace function private._backfill_users()
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_user  record;
+  v_count integer := 0;
+begin
+  for v_user in
+    select u.id, u.raw_app_meta_data, u.raw_user_meta_data, u.is_anonymous
+    from auth.users as u
+    where not coalesce(u.is_anonymous, false)
+      and (   not exists (select 1 from public.profiles as p where p.id = u.id)
+           or not exists (select 1 from public.wallets as w where w.user_id = u.id)
+           or not exists (select 1 from public.ledger_entries as l where l.external_ref = 'start:' || u.id::text))
+    order by u.id
+  loop
+    perform private._provision_user(v_user.id, v_user.raw_app_meta_data, v_user.raw_user_meta_data, v_user.is_anonymous);
+    v_count := v_count + 1;
+  end loop;
+  return v_count;
+end
+$$;
+
+revoke all on function private._backfill_users() from public, anon, authenticated;
 
 revoke all on function private.handle_new_user() from public, anon, authenticated;
 
@@ -1160,7 +1219,16 @@ end
 $$;
 
 -- ===========================================================================
--- 9. Realtime publication: exactly game_state and live_feed (section 5.5)
+-- 9. Backfill: accounts created before this migration
+-- ===========================================================================
+-- A Google account that signed in before 00004 existed has no profile,
+-- wallet, or starting grant, because the trigger did not exist yet. This
+-- provisions it exactly as the trigger would have. Idempotent: a re-run
+-- finds nothing left to do.
+select private._backfill_users();
+
+-- ===========================================================================
+-- 10. Realtime publication: exactly game_state and live_feed (section 5.5)
 -- ===========================================================================
 -- Both tables are public by schema (T15). Guarded, so a re-run is a no-op.
 do $$
@@ -1177,7 +1245,7 @@ end
 $$;
 
 -- ===========================================================================
--- 10. Self-check: fail loudly if a privilege is not as intended
+-- 11. Self-check: fail loudly if a privilege is not as intended
 -- ===========================================================================
 -- REVOKE only warns when the current role is not the grantor, so the end
 -- state is verified here as well as in supabase/tests/00004_game_ledger.test.sql.
