@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { stripComments } from '@/test/source-imports'
 import { mapRpcError } from '@/lib/errors'
 import {
@@ -9,11 +9,17 @@ import {
   isUnstorable,
   RECORD_RETRY_DELAYS_MS,
   RpcError,
+  type RecordAttemptArgs,
   type RecordAttemptInput,
   type RpcClient,
   type RpcResponse,
+  type SettlementRow,
+  type StartAttemptArgs,
   type StartAttemptInput,
+  type StartRow,
+  type StoredRow,
 } from '@/lib/game/rpc'
+import type { Database } from '@/types/database'
 
 /**
  * src/lib/game/rpc.ts (docs/ARCHITECTURE.md sections 5.1 and 5.4; R1-02,
@@ -196,6 +202,25 @@ describe('[R1-02] arguments: user text only in p_prompt, model text only in p_re
     ])
     const carriers = Object.entries(calls[0].args).filter(([, value]) => String(value).includes('REPLY-MARKER'))
     expect(carriers.map(([name]) => name)).toEqual(['p_reply'])
+  })
+})
+
+type Functions = Database['public']['Functions']
+type Columns<Fn extends keyof Functions> = Functions[Fn]['Returns'] extends readonly (infer Row)[] ? keyof Row : never
+
+describe('the generated 00007 signatures (src/types/database.ts)', () => {
+  it('parameter names match start_attempt and record_attempt exactly', () => {
+    expectTypeOf<keyof StartAttemptArgs>().toEqualTypeOf<keyof Functions['start_attempt']['Args']>()
+    expectTypeOf<keyof RecordAttemptArgs>().toEqualTypeOf<keyof Functions['record_attempt']['Args']>()
+    expectTypeOf<'p_user_id' | 'p_attempt_id'>().toEqualTypeOf<keyof Functions['attempt_result']['Args']>()
+  })
+
+  it('parsed rows have exactly the returned columns, except the wallet and treasury of start_attempt (HC3)', () => {
+    expectTypeOf<keyof SettlementRow>().toEqualTypeOf<Columns<'record_attempt'>>()
+    expectTypeOf<keyof StoredRow>().toEqualTypeOf<Columns<'attempt_result'>>()
+    expectTypeOf<keyof StartRow>().toEqualTypeOf<
+      Exclude<Columns<'start_attempt'>, 'wallet_balance_cents' | 'treasury_cents'>
+    >()
   })
 })
 

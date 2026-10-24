@@ -187,8 +187,9 @@ export class FakeAttemptDb implements RpcClient {
     const userId = String(args.p_user_id)
     const key = String(args.p_idempotency_key)
     const staleSeconds = Number(args.p_stale_seconds)
+    if (!(Number(args.p_expected_epoch) >= 1)) return fail({ code: 'PT422', message: 'invariant_violation: bounds' })
     const player = this.players.get(userId)
-    if (!player) return fail({ code: 'PT422', message: 'invariant_violation: no wallet' })
+    if (!player) return fail({ code: 'PT403', message: 'forbidden: no wallet' })
 
     const existing = this.findByKey(userId, key)
     if (existing && existing.outcome !== 'pending') return ok(this.startRow(existing, true))

@@ -1,25 +1,27 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { isE2ETestMode } from '@/lib/e2e-helpers'
+import { resolveSupabaseUrl } from '@/lib/supabase/env'
 
 /**
  * The attempt service against local Supabase (migrations 00001 to 00007),
  * with the fake Core model and the Decisions fake (docs/ARCHITECTURE.md
  * sections 3 and 5.4; HC3, HC-A5, CH-1; R2-05; T9, T13).
  *
- * It runs only when PP_LOCAL_SUPABASE=1 and the local stack's URL and secret
- * key are exported as NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY, for
- * example:
+ * It runs only in E2E test mode with the local stack's URL and secret key
+ * exported, for example:
  *
  *   pnpm db:start && pnpm db:reset
- *   PP_LOCAL_SUPABASE=1 NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SECRET_KEY=... \
- *     pnpm test -- src/app/api/attempts/attempts.integration.test.ts
+ *   E2E_TEST_MODE=true NEXT_PUBLIC_SUPABASE_URL=<API_URL> SUPABASE_SECRET_KEY=<SECRET_KEY> \
+ *     pnpm exec vitest run src/app/api/attempts/attempts.integration.test.ts
  *
- * It refuses any URL that is not on localhost or 127.0.0.1, so it can never
- * touch a hosted project. Everywhere else it is skipped.
+ * It refuses any Supabase URL that is not on localhost or 127.0.0.1, so it can
+ * never touch a hosted project. Everywhere else, including the CI unit job,
+ * it is skipped.
  */
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''
-const enabled = process.env.PP_LOCAL_SUPABASE === '1' && /^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/.test(url)
+const LOCAL_SUPABASE_URL = /^http:\/\/(?:127\.0\.0\.1|localhost):\d+$/
+const enabled = isE2ETestMode() && LOCAL_SUPABASE_URL.test(resolveSupabaseUrl()?.value ?? '')
 
 const LIMITS = {
   burst: 20,
@@ -36,7 +38,7 @@ const LIMITS = {
 }
 
 describe.runIf(enabled)('the attempt service on local Supabase', async () => {
-  const { createClient } = await import('@supabase/supabase-js')
+  const { createAdminClient } = await import('@/lib/supabase/admin')
   const { createAttemptRunner } = await import('@/lib/ai/core/run-attempt')
   const { fakeDecide } = await import('@/lib/ai/testing/fake-decisions')
   const { FakeCoreModel } = await import('@/lib/ai/testing/fake-model')
@@ -46,13 +48,11 @@ describe.runIf(enabled)('the attempt service on local Supabase', async () => {
   type RpcResponse = import('@/lib/game/rpc').RpcResponse
 
   // Created in beforeAll, which runs only when the suite is enabled.
-  let admin: ReturnType<typeof createClient>
+  let admin: ReturnType<typeof createAdminClient>
   const users: string[] = []
 
   beforeAll(async () => {
-    admin = createClient(url, process.env.SUPABASE_SECRET_KEY ?? '', {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+    admin = createAdminClient()
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     for (let index = 0; index < 2; index += 1) {
       const { data, error } = await admin.auth.admin.createUser({
@@ -150,8 +150,10 @@ describe.runIf(enabled)('the attempt service on local Supabase', async () => {
     const h = harness()
     const command = { userId: users[1], message: 'INTEGRATION-REPLAY hello', idempotencyKey: randomUUID(), expectedEpoch: await epoch() }
     const first = await performAttempt(command, h.deps)
-    const second = await performAttempt({ ...command, expectedEpoch: 0 }, h.deps)
-    if (first.kind !== 'ok' || second.kind !== 'ok') throw new Error('attempt failed')
+    // A replay answers before the epoch check, so a stale epoch still gets the stored result.
+    const second = await performAttempt({ ...command, expectedEpoch: command.expectedEpoch + 5 }, h.deps)
+    if (first.kind !== 'ok') throw new Error(`first attempt failed: ${first.mapping.body.code}`)
+    if (second.kind !== 'ok') throw new Error(`replay failed: ${second.mapping.body.code}`)
     expect(second.attempt).toEqual(first.attempt)
     expect(h.models).toHaveLength(1)
     expect(h.recorded).toHaveLength(1)
@@ -178,5 +180,29 @@ describe.runIf(enabled)('the attempt service on local Supabase', async () => {
     expect(result.kind).toBe('error')
     if (result.kind === 'error') expect(result.mapping.body).toMatchObject({ code: 'pig_changed', pigEpoch: current })
     expect(h.models).toHaveLength(0)
+  })
+
+  it('[CH-1][CH-6b] a paid win pays the pot, advances the pig, queues one job, and blocks the exact replay (runs last)', async () => {
+    const h = harness()
+    const before = await epoch()
+    const win = await performAttempt(
+      { userId: users[0], message: 'INTEGRATION-WIN E2E_WIN please', idempotencyKey: randomUUID(), expectedEpoch: before },
+      h.deps
+    )
+    if (win.kind !== 'ok') throw new Error(`win failed: ${win.mapping.body.code}`)
+    const row = (h.recorded[0].data as Record<string, unknown>[])[0]
+    expect(win.attempt).toMatchObject({ outcome: 'win', game: { pigEpoch: before + 1, treasuryCents: 0 } })
+    expect(win.attempt.payoutCents).toBe(row.payout_cents)
+    expect(win.attempt.payoutCents).toBeGreaterThan(0)
+    expect(win.attempt.levelAdvanced).toEqual({ from: row.level_from, to: row.level_to })
+    expect(row.hardening_job_id).toEqual(expect.any(String))
+
+    const replay = await performAttempt(
+      { userId: users[1], message: 'integration win  e2e_win PLEASE!', idempotencyKey: randomUUID(), expectedEpoch: before + 1 },
+      h.deps
+    )
+    if (replay.kind !== 'ok') throw new Error(`replay failed: ${replay.mapping.body.code}`)
+    expect(replay.attempt).toMatchObject({ outcome: 'blocked', technique: 'unclassified' })
+    expect(h.models).toHaveLength(1)
   })
 })

@@ -187,7 +187,41 @@ export type RecordAttemptInput = {
   userJobsPerHour: number
 }
 
-function startArgs(input: StartAttemptInput): Record<string, unknown> {
+/** start_attempt's parameters (00007). rpc.test.ts checks the names against src/types/database.ts. */
+export type StartAttemptArgs = {
+  p_user_id: string
+  p_idempotency_key: string
+  p_expected_epoch: number
+  p_prompt: string
+  p_prompt_sha256: string
+  p_prompt_fingerprint: string
+  p_reserve_micros: number
+  p_daily_cap_micros: number
+  p_attempt_share_bps: number
+  p_rate_capacity: number
+  p_rate_refill_per_min: number
+  p_daily_attempt_cap: number
+  p_stale_seconds: number
+}
+
+/** record_attempt's parameters (00007). The generated types cannot express the nullable ones. */
+export type RecordAttemptArgs = {
+  p_attempt_id: string
+  p_outcome: RecordableOutcome
+  p_reply: string | null
+  p_validator_reasons: string[]
+  p_validator_signals: string[]
+  p_tripwire_probability: number | null
+  p_technique: AttackTechnique
+  p_canary_leaked: boolean
+  p_tool_called: boolean
+  p_cost_micros: number
+  p_error_code: string | null
+  p_block_fingerprint: boolean
+  p_user_jobs_per_hour: number
+}
+
+function startArgs(input: StartAttemptInput): StartAttemptArgs {
   return {
     p_user_id: input.userId,
     p_idempotency_key: input.idempotencyKey,
@@ -205,7 +239,7 @@ function startArgs(input: StartAttemptInput): Record<string, unknown> {
   }
 }
 
-function recordArgs(input: RecordAttemptInput): Record<string, unknown> {
+function recordArgs(input: RecordAttemptInput): RecordAttemptArgs {
   return {
     p_attempt_id: input.attemptId,
     p_outcome: input.outcome,
@@ -264,6 +298,9 @@ const SettlementRowSchema = z.object({
   hardening_job_id: Uuid.nullable(),
 })
 
+/** record_attempt's row as parsed; rpc.test.ts checks its columns against src/types/database.ts. */
+export type SettlementRow = z.infer<typeof SettlementRowSchema>
+
 const StoredRowSchema = z.object({
   outcome: Outcome,
   crack_event: Crack,
@@ -281,6 +318,12 @@ const StoredRowSchema = z.object({
   current_level: LevelIdSchema,
   pig_epoch: Count,
 })
+
+/** attempt_result's row as parsed; rpc.test.ts checks its columns against src/types/database.ts. */
+export type StoredRow = z.infer<typeof StoredRowSchema>
+
+/** The start_attempt columns the service reads; wallet_balance_cents and treasury_cents are dropped (HC3). */
+export type StartRow = z.infer<typeof StartRowSchema>
 
 /**
  * What start_attempt returned, reduced to what the pipeline needs. There is
@@ -450,10 +493,10 @@ export function createAttemptRpc(options: AttemptRpcOptions = {}): AttemptRpc {
     return client
   }
 
-  async function call(fn: string, args: Record<string, unknown>): Promise<unknown> {
+  async function call(fn: string, args: StartAttemptArgs | RecordAttemptArgs | Record<string, unknown>): Promise<unknown> {
     let response: RpcResponse
     try {
-      response = await getClient().rpc(fn, args)
+      response = await getClient().rpc(fn, args as Record<string, unknown>)
     } catch (error) {
       if (error instanceof Error && /not configured/.test(error.message)) throw error
       throw toRpcError(fn, { message: 'The request failed before an answer arrived.' }, null)
