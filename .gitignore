@@ -24,6 +24,10 @@ test-results/
 calibration-report.json
 .calibration/
 
+# level 4 and 5 secret material stays on the operator's machine; it is loaded
+# into the level_secrets table by scripts/ops/seed-level-secrets.mjs (R2-12, CH2-3)
+.secrets/
+
 # vercel
 .vercel/
 
