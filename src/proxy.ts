@@ -18,11 +18,23 @@ export const config = {
   matcher: [
     /*
      * Match every request path except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - static images by extension
+     * - _next/static (static files) and _next/image (image optimization files)
+     * - favicon.ico and static images by extension
+     * - the cookie-less public API routes /api/live/snapshot, /api/health,
+     *   /api/cron/*, and /api/smoke, so CDN hits and cron calls never invoke
+     *   the proxy (ARCHITECTURE section 7, REVIEW-1 R1-24a). Each one is
+     *   followed by "/" or the end of the path, so /api/healthz, /api/cronjobs,
+     *   and /api/smoker still run the proxy.
+     * - generated metadata routes, which crawlers fetch without a session:
+     *   /robots.txt, /manifest.webmanifest, sitemap.xml files, and the icon,
+     *   apple-icon, opengraph-image, and twitter-image routes at any depth,
+     *   with the optional hash suffix Next.js adds inside route groups and an
+     *   optional image id
+     *
+     * Next.js reads this value statically at build time, so it must stay a
+     * single string literal. src/lib/supabase/proxy-matcher.test.ts checks it
+     * with Next.js's own matcher.
      */
-    '/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|api/(?:live/snapshot|health|cron|smoke)(?:/|$)|robots\\.txt$|manifest\\.webmanifest$|(?:.*/)?sitemap(?:/[^/]+)?\\.xml$|(?:.*/)?(?:icon|apple-icon|opengraph-image|twitter-image)(?:-[a-z0-9]{1,6})?(?:/[^/]+)?$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|avif|ico)$).*)',
   ],
 }

@@ -9,10 +9,10 @@ import { requirePublicSupabaseEnv } from '@/lib/supabase/env'
  * new one per request and never share it between requests.
  */
 export async function createClient() {
-  const { url, anonKey } = requirePublicSupabaseEnv()
+  const { url, publishableKey } = requirePublicSupabaseEnv()
   const cookieStore = await cookies()
 
-  return createServerClient<Database>(url, anonKey, {
+  return createServerClient<Database>(url, publishableKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll()

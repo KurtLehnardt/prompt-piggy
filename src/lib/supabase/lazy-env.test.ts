@@ -7,7 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
  */
 const NAMES = [
   'NEXT_PUBLIC_SUPABASE_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  'SUPABASE_SECRET_KEY',
   'SUPABASE_SERVICE_ROLE_KEY',
 ] as const
 
@@ -36,7 +38,9 @@ describe('importing with an empty environment', () => {
 describe('calling a factory with an empty environment', () => {
   it('client throws a clear error naming the variables', async () => {
     const { createClient } = await import('./client')
-    expect(() => createClient()).toThrow(/NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY/)
+    expect(() => createClient()).toThrow(
+      /NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY \(or the legacy NEXT_PUBLIC_SUPABASE_ANON_KEY\)/
+    )
   })
 
   it('server rejects with a clear error before touching cookies', async () => {
@@ -46,27 +50,75 @@ describe('calling a factory with an empty environment', () => {
 
   it('anon throws a clear error', async () => {
     const { createAnonClient } = await import('./anon')
-    expect(() => createAnonClient()).toThrow(/NEXT_PUBLIC_SUPABASE_ANON_KEY/)
+    expect(() => createAnonClient()).toThrow(/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/)
   })
 
-  it('admin throws a clear error naming the service-role variable', async () => {
+  it('admin throws a clear error naming both secret-key variables', async () => {
     const { createAdminClient } = await import('./admin')
-    expect(() => createAdminClient()).toThrow(/SUPABASE_SERVICE_ROLE_KEY/)
+    expect(() => createAdminClient()).toThrow(
+      /SUPABASE_SECRET_KEY \(or the legacy SUPABASE_SERVICE_ROLE_KEY\)/
+    )
   })
 
-  it('admin does not fall back to the anon key', async () => {
+  it('admin does not fall back to the publishable or anon key', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://fake-project.supabase.test')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'fake-publishable-key')
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fake-anon-key')
     const { createAdminClient } = await import('./admin')
-    expect(() => createAdminClient()).toThrow(/SUPABASE_SERVICE_ROLE_KEY/)
+    expect(() => createAdminClient()).toThrow(/SUPABASE_SECRET_KEY/)
+  })
+})
+
+describe('environment variable names', () => {
+  it.each([
+    ['only the new names', { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'fake-publishable-key' }, 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'],
+    ['only the legacy name', { NEXT_PUBLIC_SUPABASE_ANON_KEY: 'fake-anon-key' }, 'NEXT_PUBLIC_SUPABASE_ANON_KEY'],
+    [
+      'both names',
+      { NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'fake-publishable-key', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'fake-anon-key' },
+      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    ],
+  ])('the publishable key resolves from %s', async (_label, env, expectedName) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
+    const { resolveSupabasePublishableKey } = await import('./env')
+    expect(resolveSupabasePublishableKey()?.name).toBe(expectedName)
+  })
+
+  it.each([
+    ['only the new name', { SUPABASE_SECRET_KEY: 'fake-secret-key' }, 'SUPABASE_SECRET_KEY'],
+    ['only the legacy name', { SUPABASE_SERVICE_ROLE_KEY: 'fake-service-role-key' }, 'SUPABASE_SERVICE_ROLE_KEY'],
+    [
+      'both names',
+      { SUPABASE_SECRET_KEY: 'fake-secret-key', SUPABASE_SERVICE_ROLE_KEY: 'fake-service-role-key' },
+      'SUPABASE_SECRET_KEY',
+    ],
+  ])('the secret key resolves from %s', async (_label, env, expectedName) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
+    const { resolveSupabaseSecretKey } = await import('./env')
+    expect(resolveSupabaseSecretKey()?.name).toBe(expectedName)
+  })
+
+  it('treats an empty value as unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fake-anon-key')
+    const { resolveSupabasePublishableKey } = await import('./env')
+    expect(resolveSupabasePublishableKey()?.name).toBe('NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  })
+
+  it('names the missing public settings without values', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://fake-project.supabase.test')
+    const { missingPublicSupabaseEnv } = await import('./env')
+    expect(missingPublicSupabaseEnv()).toEqual([
+      'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY)',
+    ])
   })
 })
 
 describe('calling a factory once the environment is set', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://fake-project.supabase.test')
-    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'fake-anon-key')
-    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'fake-service-role-key')
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'fake-publishable-key')
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'fake-secret-key')
   })
 
   it('anon returns a client without a session', async () => {

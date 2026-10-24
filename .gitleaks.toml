@@ -7,12 +7,20 @@ title = "prompt-piggy"
 useDefault = true
 
 # The only exception: the obviously fake placeholder values that CI sets inline
-# in .github/workflows/ci.yml. Each of them contains the word "fake". Both
-# conditions must hold, so a real-looking key in ci.yml, or a value containing
-# "fake" in any other file, is still reported.
+# in .github/workflows/ci.yml. Each of them contains the word "fake", and the
+# patterns match only their exact shapes (fake-ci-<words> keys and
+# https://fake-<name>....invalid URLs), so a real key that merely contains
+# "fake" is still reported. Both conditions must hold, so a real-looking key in
+# ci.yml, or a fake-looking value in any other file, is still reported.
+#
+# CI scans a pull request with this file as it is on the base branch, so a
+# change here takes effect only after it has been reviewed and merged.
 [[allowlists]]
 description = "Obviously fake CI placeholder values in the workflow file"
 condition = "AND"
 paths = ['''^\.github/workflows/ci\.yml$''']
 regexTarget = "secret"
-regexes = ['''fake''']
+regexes = [
+  '''^fake-ci-[a-z0-9-]+$''',
+  '''^https://fake-[a-z0-9-]+(?:\.[a-z0-9-]+)*\.invalid$''',
+]

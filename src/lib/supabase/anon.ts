@@ -12,8 +12,8 @@ import { requirePublicSupabaseEnv } from '@/lib/supabase/env'
  * data or session to another.
  */
 export function createAnonClient() {
-  const { url, anonKey } = requirePublicSupabaseEnv()
-  return createClient<Database>(url, anonKey, {
+  const { url, publishableKey } = requirePublicSupabaseEnv()
+  return createClient<Database>(url, publishableKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,

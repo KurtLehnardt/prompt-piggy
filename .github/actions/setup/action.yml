@@ -4,10 +4,12 @@ description: Install pnpm, the Node version pinned in .nvmrc, and the locked dep
 runs:
   using: composite
   steps:
+    # The pnpm version comes from the packageManager field in package.json
+    # (pnpm 10), so CI, local installs, and Vercel use one exact version. The
+    # action fails if a `version` input is also given, so there is none here.
+    # Third-party action, so it is pinned to a full commit SHA.
     - name: Install pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 10
+      uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
     # node-version-file reads .nvmrc, so the version lives in exactly one place
     # and local nvm users get the same one. pnpm must be installed first for

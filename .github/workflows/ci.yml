@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - name: ESLint
         run: pnpm lint
@@ -31,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       # next-env.d.ts and .next/types are generated, not committed. typegen
       # recreates them so the typecheck sees Next.js's asset and route types.
@@ -44,6 +48,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Vitest (server and ui projects)
         run: pnpm test
@@ -53,6 +59,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
 
       # REVIEW-1 R1-14: a fresh Vercel import has no environment variables, so
@@ -64,12 +72,14 @@ jobs:
       # environment read happens inside a function, so the build never uses
       # them; they only prove that a configured build also succeeds. Real
       # values live in the Vercel project settings, never in this repository.
+      # This step uses the names the Supabase Vercel integration syncs; the e2e
+      # job uses the legacy names, so both are exercised.
       - name: next build with fake values
         env:
           NEXT_PUBLIC_APP_URL: https://fake-app.example.invalid
           NEXT_PUBLIC_SUPABASE_URL: https://fake-project.supabase.invalid
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: fake-ci-anon-key
-          SUPABASE_SERVICE_ROLE_KEY: fake-ci-service-role-key
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: fake-ci-publishable-key
+          SUPABASE_SECRET_KEY: fake-ci-secret-key
           OPENAI_API_KEY: fake-ci-openai-key
           CRON_SECRET: fake-ci-cron-secret
         run: pnpm build
@@ -79,11 +89,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Fake values, so the proxy builds a Supabase client on every request.
-      # No session cookie is ever sent, so it never calls Supabase.
+      # No session cookie is ever sent, so it never calls Supabase. These are
+      # the legacy names, which the app still reads as a fallback.
       NEXT_PUBLIC_SUPABASE_URL: https://fake-project.supabase.invalid
       NEXT_PUBLIC_SUPABASE_ANON_KEY: fake-ci-anon-key
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
@@ -106,9 +119,41 @@ jobs:
       GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     steps:
       # The full history, so a secret committed and later deleted is still found.
+      # It also fetches the base branch, which the config step below reads.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      # A pull request must not be able to allowlist its own leak.
+      # - gitleaks reads .gitleaksignore from the scanned directory, so this
+      #   repository refuses to have one at all.
+      # - On a pull request, the scan uses .gitleaks.toml from the base branch,
+      #   so a change to the allowlist only takes effect after it has been
+      #   reviewed and merged on its own. Before the base branch has a config
+      #   (the first pull request), it uses the tree's config.
+      - name: Choose the gitleaks config
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          if [ -e .gitleaksignore ]; then
+            echo "::error file=.gitleaksignore::.gitleaksignore is not allowed: it would let a commit hide its own findings. Remove the secret instead."
+            exit 1
+          fi
+          config="$RUNNER_TEMP/gitleaks.toml"
+          if [ "$EVENT_NAME" = "pull_request" ] && git cat-file -e "origin/${BASE_REF}:.gitleaks.toml" 2>/dev/null; then
+            git show "origin/${BASE_REF}:.gitleaks.toml" > "$config"
+            if ! git diff --quiet "origin/${BASE_REF}" HEAD -- .gitleaks.toml; then
+              echo "::warning file=.gitleaks.toml::This pull request changes .gitleaks.toml. It is scanned with the config from ${BASE_REF}; the change takes effect once merged."
+            fi
+            echo "Using .gitleaks.toml from origin/${BASE_REF}."
+          else
+            cp .gitleaks.toml "$config"
+            echo "Using .gitleaks.toml from the checked-out tree."
+          fi
+          echo "GITLEAKS_CONFIG_PATH=$config" >> "$GITHUB_ENV"
 
       - name: Install gitleaks
         run: |
@@ -121,12 +166,12 @@ jobs:
           "$RUNNER_TEMP/gitleaks" version
 
       # Scans every commit reachable from the checkout with the default rules
-      # plus .gitleaks.toml. Findings are redacted in the log, inline
+      # plus the config chosen above. Findings are redacted in the log, inline
       # gitleaks:allow comments are ignored, and any finding fails the job.
       - name: gitleaks (full history, redacted)
         run: |
           "$RUNNER_TEMP/gitleaks" git . \
-            --config .gitleaks.toml \
+            --config "$GITLEAKS_CONFIG_PATH" \
             --redact \
             --ignore-gitleaks-allow \
             --no-banner \
