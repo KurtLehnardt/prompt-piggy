@@ -22,6 +22,15 @@
  * src/app/live/page.tsx, in src/lib/live/**, or in src/components/**. Those
  * rules win over the allowlist.
  *
+ * Those files, and the cookie-less routes under src/app/api/live/** and
+ * src/app/api/health/**, must not reach either guarded module indirectly
+ * either (REVIEW-PR5 H1). A second pass starts from each of them, walks its
+ * local imports breadth-first through any number of modules, allowed ones
+ * included, and fails with the import chain when the walk reaches
+ * src/lib/supabase/admin.ts or src/lib/supabase/env.server.ts. So a live
+ * route that imports src/lib/game/rpc.ts, which imports the admin client,
+ * fails even though rpc.ts itself is allowed.
+ *
  * The same rules guard @/lib/supabase/env.server, the only module that reads
  * the secret-key variables (REVIEW-3 R3-14). Only the admin client and the
  * /health page, which shows the variable's name and never its value, may
@@ -59,6 +68,10 @@ const UNIT_TEST_FILE = /\.(?:test|spec)\.[cm]?[jt]sx?$/
 
 /** Denied everywhere, whatever the allowlist says. An entry ending in "/" is a prefix. */
 const ALWAYS_DENIED = ['src/app/live/page.tsx', 'src/lib/live/', 'src/components/']
+
+/** Paths that must not reach a guarded module through any chain of imports. 'use client' files are added to these. */
+const TRANSITIVE_DENIED = [...ALWAYS_DENIED, 'src/app/api/live/', 'src/app/api/health/']
+const RESOLVE_EXTENSIONS = ['', '.ts', '.tsx', '.js', '.jsx', '.mjs', '/index.ts', '/index.tsx', '/index.js']
 
 const GUARDED_MODULES = [
   {
@@ -119,6 +132,56 @@ function resolveSpecifier(fromPath, specifier) {
   return target.replace(RESOLVABLE_SUFFIXES, '').replace(/\/index$/, '')
 }
 
+/** The repository path that a local specifier names, before extension resolution, or null for a package import. */
+function localBase(fromPath, specifier) {
+  if (specifier.startsWith('@/')) return `src/${specifier.slice(2)}`
+  if (specifier.startsWith('./') || specifier.startsWith('../')) {
+    return posix.normalize(posix.join(posix.dirname(fromPath), specifier))
+  }
+  return null
+}
+
+/** The repository file a local base path resolves to, or null when no such file exists. */
+function resolveFile(root, base) {
+  for (const extension of RESOLVE_EXTENSIONS) {
+    const candidate = join(root, base + extension)
+    if (existsSync(candidate) && statSync(candidate).isFile()) return base + extension
+  }
+  return null
+}
+
+/**
+ * Every chain of local imports from `start` that ends at a guarded module and
+ * passes through at least one other module. Direct imports are reported by
+ * the first pass. An unresolved path is still judged by its name, so a
+ * missing file cannot hide a guarded import.
+ */
+function transitiveChains(root, start, readSource) {
+  const found = []
+  const seen = new Set([start])
+  const queue = [[start]]
+  while (queue.length > 0) {
+    const chain = queue.shift()
+    const file = chain[chain.length - 1]
+    const source = readSource(file)
+    if (source === undefined) continue
+    for (const specifier of importSpecifiers(source)) {
+      const base = localBase(file, specifier)
+      if (base === null) continue
+      const resolved = resolveFile(root, base)
+      const target = (resolved ?? base).replace(RESOLVABLE_SUFFIXES, '').replace(/\/index$/, '')
+      const guarded = GUARDED_MODULES.find((candidate) => candidate.module === target)
+      if (guarded) {
+        if (chain.length > 1) found.push({ guarded, chain: [...chain, resolved ?? base] })
+      } else if (resolved !== null && !seen.has(resolved)) {
+        seen.add(resolved)
+        queue.push([...chain, resolved])
+      }
+    }
+  }
+  return found
+}
+
 function matchesEntry(path, entry) {
   return entry.endsWith('/') ? path.startsWith(entry) : path === entry
 }
@@ -143,12 +206,23 @@ function check(root) {
   const failures = []
   let scanned = 0
   let importers = 0
+  const sources = new Map()
+  const readSource = (path) => {
+    if (!sources.has(path)) {
+      const full = join(root, path)
+      sources.set(path, existsSync(full) && statSync(full).isFile() ? readFileSync(full, 'utf8') : undefined)
+    }
+    return sources.get(path)
+  }
+  const transitiveStarts = []
   for (const path of gitFiles(root)) {
     if (!SCAN_PREFIXES.some((prefix) => path.startsWith(prefix)) || !CODE_FILE.test(path)) continue
-    const full = join(root, path)
-    if (!existsSync(full) || !statSync(full).isFile()) continue
+    const source = readSource(path)
+    if (source === undefined) continue
     scanned++
-    const source = readFileSync(full, 'utf8')
+    if (!UNIT_TEST_FILE.test(path) && (hasUseClientDirective(source) || TRANSITIVE_DENIED.some((entry) => matchesEntry(path, entry)))) {
+      transitiveStarts.push(path)
+    }
     const ownModule = path.replace(RESOLVABLE_SUFFIXES, '')
     const targets = new Set(importSpecifiers(source).map((specifier) => resolveSpecifier(path, specifier)))
     for (const guarded of GUARDED_MODULES) {
@@ -165,7 +239,15 @@ function check(root) {
       }
     }
   }
-  console.log(`Scanned ${scanned} source files; ${importers} import(s) of a guarded secret-key module.`)
+  for (const start of transitiveStarts) {
+    for (const { guarded, chain } of transitiveChains(root, start, readSource)) {
+      failures.push(`${start} reaches ${guarded.label} indirectly: ${chain.join(' -> ')}.`)
+    }
+  }
+  console.log(
+    `Scanned ${scanned} source files; ${importers} direct import(s) of a guarded secret-key module; ` +
+      `${transitiveStarts.length} denied or 'use client' file(s) walked transitively.`
+  )
   for (const failure of failures) console.error(`FAIL  ${failure}`)
   if (failures.length > 0) {
     console.error(
@@ -215,6 +297,35 @@ const SELF_TEST_CASES = [
     files: { 'src/lib/live/snapshot.ts': importAdmin() },
   },
   {
+    name: 'a denied live route that reaches the admin client through the allowed RPC wrapper is rejected',
+    expect: 1,
+    files: {
+      'src/lib/supabase/admin.ts': "import 'server-only'\n",
+      'src/lib/game/rpc.ts': importAdmin(),
+      'src/app/api/live/snapshot/route.ts': "import { call } from '@/lib/game/rpc'\n",
+    },
+  },
+  {
+    name: 'the live library reaching the admin client through a re-export is rejected',
+    expect: 1,
+    files: {
+      'src/lib/supabase/admin.ts': "import 'server-only'\n",
+      'src/lib/supabase/service.ts': "export { createAdminClient } from './admin'\n",
+      'src/lib/live/feed.ts': "import { createAdminClient } from '../supabase/service'\n",
+    },
+  },
+  {
+    name: "a 'use client' file reaching the secret-key reader through two modules is rejected",
+    expect: 1,
+    files: {
+      'src/lib/supabase/env.server.ts': "import 'server-only'\n",
+      'src/lib/supabase/admin.ts': importEnvServer(),
+      'src/lib/game/rpc.ts': importAdmin(),
+      'src/lib/hooks/use-thing.ts': "export const load = () => import('@/lib/game/rpc')\n",
+      'src/app/(game)/play/view.tsx': USE_CLIENT + "import { load } from '@/lib/hooks/use-thing'\n",
+    },
+  },
+  {
     name: "a unit test that contains 'use client' is still rejected",
     expect: 1,
     files: { 'src/components/wallet/wallet-panel.test.tsx': USE_CLIENT + importAdmin() },
@@ -238,6 +349,11 @@ const SELF_TEST_CASES = [
       'src/lib/game/attempt-service.ts': importAdmin(),
       'src/lib/game/attempt-service.test.ts': importAdmin(),
       'src/lib/errors.test.ts': "const load = () => import('@/lib/supabase/admin')\n",
+      'src/app/api/wallet/repair/route.ts': "import { call } from '@/lib/game/rpc'\n",
+      'src/lib/utils.ts': 'export const cn = () => ""\n',
+      'src/lib/live/labels.ts': "import { cn } from '@/lib/utils'\n",
+      'src/app/api/health/route.ts': "import { cn } from '../../../lib/utils'\n",
+      'src/components/live/feed.tsx': USE_CLIENT + "import { cn } from '@/lib/utils'\n",
       'src/lib/game/rpc.ts': importAdmin('../supabase/admin'),
       'src/lib/hardening/pipeline/process-job.ts': importAdmin(),
       'src/lib/ai/calibration/run.ts': importAdmin(),

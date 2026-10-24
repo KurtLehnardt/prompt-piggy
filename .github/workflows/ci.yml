@@ -87,6 +87,9 @@ jobs:
   e2e:
     name: E2E tests
     runs-on: ubuntu-latest
+    # It pulls and starts local Supabase, so a hung start or dev server must
+    # not hold a runner for the default 360 minutes (REVIEW-PR5 M3).
+    timeout-minutes: 30
     env:
       # The origin of the dev server that Playwright starts (playwright.config.ts
       # uses port 3000 unless PLAYWRIGHT_PORT is set, and CI does not set it).
@@ -445,16 +448,29 @@ jobs:
           #   advisor reports this as lints 0028 and 0029. CLI 2.122 does not
           #   run those two lints yet; the entries stay so the allowlist is
           #   still right when it does.
-          # - rls_enabled_no_policy (level INFO) on public tables: deny by
-          #   default. A table with RLS enabled and no policy is reachable only
-          #   by service_role, which is the intended access model for every
-          #   table that ARCHITECTURE section 5.3 gives no policy.
+          # - rls_enabled_no_policy (level INFO) on the section 5.3 tables
+          #   with no policy: deny by default. A table with RLS enabled and no
+          #   policy is reachable only by service_role, which is the intended
+          #   access model for exactly these ten tables in ARCHITECTURE
+          #   section 5.3. app_config is not listed, because 00001 gives it a
+          #   restrictive policy. Any other table without a policy fails the
+          #   job and needs an explicit decision (REVIEW-PR5 M1). Entries for
+          #   tables that do not exist yet are only logged as unused.
           ADVISOR_SECURITY_ALLOWLIST: |
             anon_security_definer_function_executable public.get_level_status
             authenticated_security_definer_function_executable public.get_level_status
             anon_security_definer_function_executable public.get_public_config
             authenticated_security_definer_function_executable public.get_public_config
-            rls_enabled_no_policy public.*
+            rls_enabled_no_policy public.rule_sets
+            rls_enabled_no_policy public.rule_gate_runs
+            rls_enabled_no_policy public.golden_prompts
+            rls_enabled_no_policy public.blocked_fingerprints
+            rls_enabled_no_policy public.level_secrets
+            rls_enabled_no_policy public.ai_spend
+            rls_enabled_no_policy public.rate_limits
+            rls_enabled_no_policy public.hardening_jobs
+            rls_enabled_no_policy public.admin_actions
+            rls_enabled_no_policy public.leases
         run: |
           set -euo pipefail
           report="$RUNNER_TEMP/supabase-advisors.json"
