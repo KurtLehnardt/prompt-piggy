@@ -88,6 +88,11 @@ jobs:
     name: E2E tests
     runs-on: ubuntu-latest
     env:
+      # The origin of the dev server that Playwright starts (playwright.config.ts
+      # uses port 3000 unless PLAYWRIGHT_PORT is set, and CI does not set it).
+      # The same-origin check on POST routes compares against it, so without it
+      # every E2E POST would get 403.
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
       # REVIEW-3 R3-03: an obviously fake projector token (at least 32
       # characters, containing "fake"), so /live/enter works in E2E runs. Like
       # every fake value in this file it has the fake-ci-* shape that
@@ -350,12 +355,28 @@ jobs:
           fi
           echo "gitleaks reported the generated token (github-pat) and exited 1, as expected."
 
-      # Scans every commit reachable from the checkout with the default rules
-      # plus the config chosen above. Findings are redacted in the log, inline
+      # Scans every commit reachable from HEAD with the default rules plus the
+      # config chosen above. On a pull request, HEAD is GitHub's merge commit,
+      # so that is the base branch's full history plus every commit of this
+      # pull request. On a push to main, it is main's full history. Other
+      # fetched branches are not scanned: without --log-opts gitleaks runs
+      # `git log --all`, so one finding on any parallel branch failed every
+      # pull request, and only a force-push could clear it. That branch's own
+      # pull request still scans it. Findings are redacted in the log, inline
       # gitleaks:allow comments are ignored, and any finding fails the job.
-      - name: gitleaks (full history, redacted)
+      - name: gitleaks (base branch history and this change, redacted)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Scanning the history of ${BASE_REF} plus $(git rev-list --count "origin/${BASE_REF}..HEAD") commit(s) of this pull request (merge commit included)."
+          else
+            echo "Scanning the full history of ${GITHUB_REF_NAME}: $(git rev-list --count HEAD) commit(s)."
+          fi
           "$RUNNER_TEMP/gitleaks" git . \
+            --log-opts="--full-history HEAD" \
             --config "$GITLEAKS_CONFIG_PATH" \
             --redact \
             --ignore-gitleaks-allow \
