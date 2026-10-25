@@ -30,6 +30,10 @@ import { promptMessageSchema, type AttemptResultDTO, type LevelId } from '@/type
  *   disabled for retryAfterSeconds.
  * - A 404 means the attempt route is not deployed yet: it shows an
  *   "attacks open soon" note instead of an error.
+ * - Every other refusal (nothing was charged) and a lost connection show a
+ *   toast and also stay on screen as a note under Send until the next
+ *   submission, so a player who missed the toast still sees why nothing
+ *   happened.
  *
  * Results go to the parent through onAttempt, which drives the strike scene
  * and the crack state from the response alone.
@@ -65,6 +69,8 @@ export function AttemptForm({
   const [inFlight, setInFlight] = useState(false)
   const [cooldown, setCooldown] = useState(0)
   const [notOpen, setNotOpen] = useState(false)
+  // Why the last submission did not run, kept until the next one.
+  const [notice, setNotice] = useState<string | null>(null)
   const inFlightRef = useRef(false)
   // The newest epoch learned from a pig_changed error. Epochs only grow, so
   // the larger of this and the prop is always the current one.
@@ -86,25 +92,34 @@ export function AttemptForm({
         if (error.pigEpoch > 0) adoptedEpoch.current = Math.max(adoptedEpoch.current, error.pigEpoch)
         onPigChanged({ pigEpoch: error.pigEpoch, level: error.level })
         toast.info(PIG_CHANGED_MESSAGE)
+        setNotice(PIG_CHANGED_MESSAGE)
         return
-      case 'attempt_in_flight':
-        if (!error.sameKey) {
-          toast.warning(OTHER_ATTEMPT_RUNNING_MESSAGE)
-          setCooldown(error.retryAfterSeconds)
-          return
-        }
-        toast.warning(errorMessage(failure))
+      case 'attempt_in_flight': {
+        const text = error.sameKey ? errorMessage(failure) : OTHER_ATTEMPT_RUNNING_MESSAGE
+        toast.warning(text)
+        setNotice(text)
+        if (!error.sameKey) setCooldown(error.retryAfterSeconds)
         return
-      case 'rate_limited':
-        toast.warning(errorMessage(failure))
+      }
+      case 'rate_limited': {
+        const text = errorMessage(failure)
+        toast.warning(text)
+        setNotice(text)
         if (failure.retryAfterSeconds !== null) setCooldown(Math.min(failure.retryAfterSeconds, 300))
         return
-      case 'unauthorized':
-        toast.error(errorMessage(failure))
+      }
+      case 'unauthorized': {
+        const text = errorMessage(failure)
+        toast.error(text)
+        setNotice(text)
         onUnauthorized?.()
         return
-      default:
-        toast.error(errorMessage(failure))
+      }
+      default: {
+        const text = errorMessage(failure)
+        toast.error(text)
+        setNotice(text)
+      }
     }
   }
 
@@ -113,6 +128,7 @@ export function AttemptForm({
     if (inFlightRef.current || disabled) return
     inFlightRef.current = true
     setInFlight(true)
+    setNotice(null)
     const seq = nextSeq()
     const expectedEpoch = Math.max(pigEpoch, adoptedEpoch.current)
     try {
@@ -128,6 +144,7 @@ export function AttemptForm({
           break
         case 'unreachable':
           toast.error(UNREACHABLE_MESSAGE)
+          setNotice(UNREACHABLE_MESSAGE)
           break
         case 'error':
           handleFailure(result)
@@ -175,6 +192,11 @@ export function AttemptForm({
       {!attemptsEnabled ? (
         <p className="text-sm text-muted-foreground" data-testid="attempts-closed">
           The vault is closed right now.
+        </p>
+      ) : null}
+      {notice ? (
+        <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm" data-testid="attempt-notice">
+          {notice}
         </p>
       ) : null}
       {notOpen ? (

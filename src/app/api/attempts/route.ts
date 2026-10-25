@@ -1,6 +1,6 @@
 import { after, NextResponse, type NextRequest } from 'next/server'
 import { requireUserApi } from '@/lib/auth/require-user'
-import { errorResponse, jsonError, mapRpcError } from '@/lib/errors'
+import { errorResponse, jsonError, mapRpcError, type RpcErrorMapping } from '@/lib/errors'
 import { performAttempt } from '@/lib/game/attempt-service'
 import { assertSameOrigin } from '@/lib/http/origin'
 import { isKilledByEnv } from '@/lib/ops/kill-switch'
@@ -28,6 +28,10 @@ import { attemptRequestSchema, type AttemptResponseDTO } from '@/types/api'
  * A system error during the attempt is not an HTTP error: it is a 200 with
  * outcome `error` and the refund. There is no GET /api/attempts/[id]; a
  * client that lost a response re-posts the same idempotency key (R2-S3).
+ *
+ * Every error response after step 1 writes one `attempt_refused` warn line
+ * with the error code and HTTP status only, so the function logs show why an
+ * attack got no result (T25: never the message, the body, or a hint).
  */
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -36,6 +40,21 @@ export const maxDuration = 30
 
 /** A body larger than this is refused before it is parsed. The message itself is at most 4,000 characters. */
 const MAX_BODY_BYTES = 32 * 1024
+
+/** The refusal log line: an event code, the error code, and the status, nothing else (T25). */
+function logRefusal(code: string, status: number): void {
+  console.warn(JSON.stringify({ event: 'attempt_refused', code, status }))
+}
+
+function refuse(code: 'forbidden' | 'invalid_request' | 'kill_switch', status: number) {
+  logRefusal(code, status)
+  return jsonError(code, status)
+}
+
+function refuseWith(mapping: RpcErrorMapping) {
+  logRefusal(mapping.body.code, mapping.status)
+  return errorResponse(mapping)
+}
 
 async function readJson(request: NextRequest): Promise<{ ok: true; value: unknown } | { ok: false }> {
   const declared = Number(request.headers.get('content-length') ?? '0')
@@ -53,21 +72,21 @@ export async function POST(request: NextRequest) {
   const auth = await requireUserApi()
   if (!auth.ok) return auth.response
 
-  if (!assertSameOrigin(request)) return jsonError('forbidden', 403)
+  if (!assertSameOrigin(request)) return refuse('forbidden', 403)
 
   let maxPromptChars: number
   try {
     maxPromptChars = getLimits().maxPromptChars
   } catch (error) {
-    return errorResponse(mapRpcError(error))
+    return refuseWith(mapRpcError(error))
   }
 
   const json = await readJson(request)
-  if (!json.ok) return jsonError('invalid_request', 400)
+  if (!json.ok) return refuse('invalid_request', 400)
   const body = attemptRequestSchema(maxPromptChars).safeParse(json.value)
-  if (!body.success) return jsonError('invalid_request', 400)
+  if (!body.success) return refuse('invalid_request', 400)
 
-  if (isKilledByEnv()) return jsonError('kill_switch', 503)
+  if (isKilledByEnv()) return refuse('kill_switch', 503)
 
   const result = await performAttempt({
     userId: auth.user.id,
@@ -77,7 +96,7 @@ export async function POST(request: NextRequest) {
   })
   after(result.afterResponse)
 
-  if (result.kind === 'error') return errorResponse(result.mapping)
+  if (result.kind === 'error') return refuseWith(result.mapping)
   const payload: AttemptResponseDTO = { attempt: result.attempt }
   return NextResponse.json(payload, { headers: { 'cache-control': 'no-store' } })
 }

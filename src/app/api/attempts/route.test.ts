@@ -233,3 +233,52 @@ describe('the attempt', () => {
     expect(afterTasks).toEqual([afterResponse])
   })
 })
+
+describe('refusal logging (T25)', () => {
+  function refusalLines(warn: { mock: { calls: unknown[][] } }) {
+    return warn.mock.calls
+      .map((call) => String(call[0]))
+      .filter((line) => line.includes('attempt_refused'))
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+  }
+
+  it('writes one attempt_refused line with the code and status for a service refusal, and nothing else', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { mapRpcError } = await import('@/lib/errors')
+    performAttempt.mockResolvedValue({
+      kind: 'error',
+      mapping: mapRpcError({ code: 'PT503', message: 'kill_switch: attempts are paused', hint: 'SECRET HINT' }),
+      afterResponse,
+    })
+    const response = await (await load()).POST(post({ body: { message: 'SECRET PROMPT', idempotencyKey: KEY, expectedEpoch: 1 } }))
+    expect(response.status).toBe(503)
+    expect(refusalLines(warn)).toEqual([{ event: 'attempt_refused', code: 'kill_switch', status: 503 }])
+    const logged = warn.mock.calls.map((call) => String(call[0])).join('\n')
+    expect(logged).not.toContain('SECRET PROMPT')
+    expect(logged).not.toContain('SECRET HINT')
+  })
+
+  it('logs the early refusals: a foreign Origin, a bad body, and PIGGY_KILL_SWITCH', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const route = await load()
+    await route.POST(post({ origin: 'https://evil.example' }))
+    await route.POST(post({ raw: '{not json' }))
+    vi.stubEnv('PIGGY_KILL_SWITCH', '1')
+    vi.resetModules()
+    await (await load()).POST(post())
+    expect(refusalLines(warn)).toEqual([
+      { event: 'attempt_refused', code: 'forbidden', status: 403 },
+      { event: 'attempt_refused', code: 'invalid_request', status: 400 },
+      { event: 'attempt_refused', code: 'kill_switch', status: 503 },
+    ])
+  })
+
+  it('writes no refusal line for a finished attempt or a signed-out request', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const route = await load()
+    expect((await route.POST(post())).status).toBe(200)
+    getUser.mockResolvedValue({ data: { user: null }, error: null })
+    expect((await route.POST(post())).status).toBe(401)
+    expect(refusalLines(warn)).toEqual([])
+  })
+})

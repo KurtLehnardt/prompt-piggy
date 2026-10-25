@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ApiClientDeps } from '@/lib/game/api-client'
+import { UNREACHABLE_MESSAGE, type ApiClientDeps } from '@/lib/game/api-client'
 import type { AttemptResultDTO, LevelId } from '@/types/api'
 
 const toast = vi.hoisted(() =>
@@ -165,6 +165,7 @@ describe('AttemptForm', () => {
     type('attack')
     fireEvent.click(submit())
     await waitFor(() => expect(toast.warning).toHaveBeenCalledWith('Another attack from your account is still running.'))
+    expect(screen.getByTestId('attempt-notice').textContent).toBe('Another attack from your account is still running.')
     await waitFor(() => expect(submit().textContent).toBe('Wait 3s'))
     expect(submit().disabled).toBe(true)
     for (let second = 0; second < 3; second++) {
@@ -183,6 +184,7 @@ describe('AttemptForm', () => {
     type('attack')
     fireEvent.click(submit())
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('You need $1.00 to attack. Your wallet has $0.40.'))
+    expect(screen.getByTestId('attempt-notice').textContent).toBe('You need $1.00 to attack. Your wallet has $0.40.')
   })
 
   it('maps 503 level_not_configured to "This level is not ready yet."', async () => {
@@ -210,6 +212,42 @@ describe('AttemptForm', () => {
     await waitFor(() => expect(onAttempt).toHaveBeenCalledTimes(1))
     const [first, second] = client.bodies()
     expect(second.idempotencyKey).toBe(first.idempotencyKey)
+  })
+
+  it('keeps a refusal on screen after the toast, and clears it on the next submission', async () => {
+    const closed = { error: 'The vault is closed right now.', code: 'kill_switch' }
+    const onAttempt = vi.fn()
+    const client = clientWith([json(503, closed), json(200, { attempt: ATTEMPT })])
+    render(<Harness deps={client.deps} onAttempt={onAttempt} />)
+    type('attack')
+    fireEvent.click(submit())
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Vault closed. The vault is closed right now.'))
+    const notice = screen.getByTestId('attempt-notice')
+    expect(notice.textContent).toBe('Vault closed. The vault is closed right now.')
+    expect(notice.getAttribute('role')).toBe('alert')
+    // The message is kept, so the player can send it again.
+    expect(input().value).toBe('attack')
+    await waitFor(() => expect(submit().disabled).toBe(false))
+    fireEvent.click(submit())
+    await waitFor(() => expect(onAttempt).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId('attempt-notice')).toBeNull()
+  })
+
+  it('keeps the lost-connection message on screen', async () => {
+    const lost = Array.from({ length: 6 }, () => new TypeError('Failed to fetch'))
+    render(<Harness deps={clientWith(lost).deps} />)
+    type('attack')
+    fireEvent.click(submit())
+    await waitFor(() => expect(screen.getByTestId('attempt-notice').textContent).toBe(UNREACHABLE_MESSAGE))
+    expect(toast.error).toHaveBeenCalledWith(UNREACHABLE_MESSAGE)
+  })
+
+  it('shows no notice for a finished attempt or the "attacks open soon" note', async () => {
+    render(<Harness deps={clientWith([new Response('<html>Not found</html>', { status: 404 })]).deps} />)
+    type('attack')
+    fireEvent.click(submit())
+    await waitFor(() => expect(screen.getByTestId('attempts-open-soon')).toBeTruthy())
+    expect(screen.queryByTestId('attempt-notice')).toBeNull()
   })
 
   it('stays disabled when attempts are closed', () => {

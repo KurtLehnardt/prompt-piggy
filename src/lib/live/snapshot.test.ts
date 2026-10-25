@@ -225,6 +225,21 @@ describe('buildLiveSnapshot', () => {
     expect(json.levels.map((level: { name: string }) => level.name)).toEqual(['Piglet', 'Porker'])
   })
 
+  it('reports attemptsEnabled false while PIGGY_KILL_SWITCH refuses every attempt', async () => {
+    vi.stubEnv('PIGGY_KILL_SWITCH', '1')
+    const { buildLiveSnapshot } = await import('./snapshot')
+    const snapshot = await buildLiveSnapshot(fakeClient().client as never)
+    expect(snapshot.config).toEqual({ attemptsEnabled: false, attemptPriceCents: 100, repairPriceCents: 100 })
+  })
+
+  it('reports attemptsEnabled false while the server environment does not parse, because the attempt route then answers 503', async () => {
+    vi.stubEnv('RATE_LIMIT_BURST', 'not a number')
+    const { buildLiveSnapshot } = await import('./snapshot')
+    const snapshot = await buildLiveSnapshot(fakeClient().client as never)
+    expect(snapshot.config.attemptsEnabled).toBe(false)
+    expect(snapshot.game.treasuryCents).toBe(12_345)
+  })
+
   it('uses createAnonClient() by default', async () => {
     const { client } = fakeClient()
     createAnonClient.mockReturnValue(client)
@@ -305,6 +320,12 @@ describe('GET /api/health', () => {
         config: { data: [{ attempts_enabled: false, attempt_price_cents: 100, repair_price_cents: 100 }], error: null },
       }).client
     )
+    expect(await (await (await load()).GET()).json()).toEqual({ ok: true, attemptsEnabled: false })
+  })
+
+  it('reports attemptsEnabled false while PIGGY_KILL_SWITCH is set, even when the config says true', async () => {
+    vi.stubEnv('PIGGY_KILL_SWITCH', 'true')
+    createAnonClient.mockReturnValue(fakeClient().client)
     expect(await (await (await load()).GET()).json()).toEqual({ ok: true, attemptsEnabled: false })
   })
 
