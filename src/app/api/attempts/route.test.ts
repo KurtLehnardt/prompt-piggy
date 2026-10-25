@@ -144,6 +144,20 @@ describe('auth, origin, and body', () => {
     expect(performAttempt).not.toHaveBeenCalled()
   })
 
+  it('[T20] accepts a same-origin POST when NEXT_PUBLIC_APP_URL was not set at build time', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', undefined)
+    const response = await (await load()).POST(post())
+    expect(response.status).toBe(200)
+    expect(performAttempt).toHaveBeenCalledTimes(1)
+  })
+
+  it('[T20] still refuses a foreign Origin when NEXT_PUBLIC_APP_URL is unset', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', undefined)
+    const response = await (await load()).POST(post({ origin: 'https://evil.example' }))
+    expect(response.status).toBe(403)
+    expect(performAttempt).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['extra keys', { message: 'hi', idempotencyKey: KEY, expectedEpoch: 1, userId: 'x' }],
     ['a level chosen by the client', { message: 'hi', idempotencyKey: KEY, expectedEpoch: 1, level: 5 }],
