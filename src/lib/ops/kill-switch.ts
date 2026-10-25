@@ -12,3 +12,19 @@ import { getEnv } from '@/lib/env'
 export function isKilledByEnv(): boolean {
   return getEnv().PIGGY_KILL_SWITCH
 }
+
+/**
+ * True when the environment refuses every attempt, for the public
+ * `attemptsEnabled` flag of /api/health and the live snapshot, so /play shows
+ * "Vault closed" instead of an Attack button that can only fail. That is the
+ * case while PIGGY_KILL_SWITCH is set, and also while the server environment
+ * does not parse, because POST /api/attempts then answers 503 `unavailable`
+ * before it charges anything. It never throws.
+ */
+export function attemptsBlockedByEnv(): boolean {
+  try {
+    return isKilledByEnv()
+  } catch {
+    return true
+  }
+}

@@ -1,4 +1,5 @@
 import 'server-only'
+import { attemptsBlockedByEnv } from '@/lib/ops/kill-switch'
 import { createAnonClient } from '@/lib/supabase/anon'
 import { LiveSnapshotSchema, type LiveSnapshotDTO } from '@/types/api'
 
@@ -81,7 +82,9 @@ export async function buildLiveSnapshot(client: SnapshotClient = createAnonClien
       ruleVersion: row.rule_version,
     })),
     config: {
-      attemptsEnabled: configRow.attempts_enabled === true,
+      // The database flag, closed as well while the environment refuses every
+      // attempt (PIGGY_KILL_SWITCH), so /play shows "Vault closed".
+      attemptsEnabled: configRow.attempts_enabled === true && !attemptsBlockedByEnv(),
       attemptPriceCents: configRow.attempt_price_cents ?? 0,
       repairPriceCents: configRow.repair_price_cents ?? 0,
     },
