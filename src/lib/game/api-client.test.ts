@@ -226,6 +226,12 @@ describe('errorMessage', () => {
     expect(text.length).toBeGreaterThan(5)
   })
 
+  it('403 forbidden says the request was blocked and does not suggest a reload', () => {
+    const text = errorMessage({ error: { error: 'x', code: 'forbidden' }, retryAfterSeconds: null })
+    expect(text).toBe('That request was blocked.')
+    expect(text).not.toMatch(/reload/i)
+  })
+
   it('429 shows the Retry-After seconds', () => {
     expect(errorMessage({ error: { error: 'x', code: 'rate_limited' }, retryAfterSeconds: 7 })).toContain('7 seconds')
   })

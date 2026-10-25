@@ -303,7 +303,7 @@ export function errorMessage(failure: Pick<ApiFailure, 'error' | 'retryAfterSeco
     case 'insufficient_funds':
       return error.error
     case 'forbidden':
-      return 'You are not allowed to do that. Reload the page and try again.'
+      return 'That request was blocked.'
     case 'not_found':
       return 'That was not found.'
     case 'attempt_in_flight':

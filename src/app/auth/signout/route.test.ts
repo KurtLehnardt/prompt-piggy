@@ -66,9 +66,16 @@ describe('POST /auth/signout', () => {
     expect(signOut).not.toHaveBeenCalled()
   })
 
-  it('answers 403 when NEXT_PUBLIC_APP_URL is unset (fails closed)', async () => {
+  it('signs out a same-origin POST when NEXT_PUBLIC_APP_URL is unset (the Origin matches the request host)', async () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', undefined)
-    expect((await (await load()).POST(post(APP))).status).toBe(403)
+    const response = await (await load()).POST(post(APP))
+    expect(response.status).toBe(302)
+    expect(signOut).toHaveBeenCalledTimes(1)
+  })
+
+  it('still answers 403 to a cross-origin POST when NEXT_PUBLIC_APP_URL is unset (fails closed)', async () => {
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', undefined)
+    expect((await (await load()).POST(post('https://evil.example'))).status).toBe(403)
     expect(signOut).not.toHaveBeenCalled()
   })
 
